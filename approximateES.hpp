@@ -105,6 +105,14 @@ class ApproximateES
 
             iter++;
         }
+        cout<<"Done: "<<endl;
+        cout<<kmc<<endl;
+        cout<<"labelings:"<<endl;
+        for(size_t i = 0; i < labelings.size(); i++)
+        {
+            cout<<labelings[i][0].x<<" ";
+        }
+        cout<<endl;
     }
 
     ~ApproximateES()
