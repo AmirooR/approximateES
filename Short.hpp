@@ -32,7 +32,7 @@ struct Short
 
 typedef boost::shared_array<Short> short_array;
 
-bool operator!=(const short_array& s1, const short_array& s2)
+/*bool operator!=(const short_array& s1, const short_array& s2)
 {
     for(size_t i = 0; i < 10; i++)
     {
@@ -52,5 +52,5 @@ bool operator==(const short_array& s1, const short_array& s2)
     }
     return true;
 
-}
+}*/
 

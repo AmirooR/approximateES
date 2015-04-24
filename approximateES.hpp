@@ -58,6 +58,17 @@ class ApproximateES
         labelings.push_back( x0 );
     }
 
+    bool compare(const short_array& s1, const short_array& s2)
+    {
+        for(size_t i = 0; i < N; i++)
+        {
+            if( s1[i] != s2[i] )
+                return false;
+        }
+        return true;
+
+    }
+
     void loop()
     {
         size_t iter = 0;
@@ -77,7 +88,7 @@ class ApproximateES
                 min_x = x2;
             }
 
-            if( min_x != u.x_l && min_x != u.x_r)
+            if( !compare( min_x, u.x_l) && !compare(min_x, u.x_r) )
             {
                 LineSegment l( min_m, min_b, lambda_min, lambda_max, false );
                 kmc.addLineSegment(l);
