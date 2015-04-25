@@ -11,27 +11,27 @@ class TestEnergyMinimizer: public EnergyMinimizer
     
     virtual short_array minimize(short_array input, float lambda, float& energy, float &m, float& b)
     {
-        short_array x( new Short[1] );
+        short_array x( new short[1] );
         if( lambda <= -0.5 )
         {
             m = 1;
             b = 1;
             energy = m*lambda + b;
-            x[0] = Short(0);
+            x[0] = short(0);
         }
         else if( lambda <= 0.5)
         {
             m = 0;
             b = 0.5;
             energy = m*lambda + b;
-            x[0] = Short(1);
+            x[0] = short(1);
         }
         else if( lambda <= 1)
         {
             m = -1;
             b = 1;
             energy = m*lambda + b;
-            x[0] = Short(2);
+            x[0] = short(2);
         }
         return x;
     }

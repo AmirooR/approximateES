@@ -2,7 +2,6 @@
 
 #include "keep-me-concave/keep_me_concave.hpp"
 #include <queue>
-#include "Short.hpp"
 #include "EnergyMinimizer.hpp"
 
 typedef struct Undefined
@@ -39,9 +38,9 @@ class ApproximateES
     size_t max_iter;
 
     public:
-    ApproximateES(size_t _N, float _lambda_min, float _lambda_max, EnergyMinimizer* _m ,short* _x0 = NULL, size_t max_iter = 10000):kmc(_lambda_min, _lambda_max), lambda_min(_lambda_min), lambda_max(_lambda_max), N(_N), minimizer(_m)
+    ApproximateES(size_t _N, float _lambda_min, float _lambda_max, EnergyMinimizer* _m ,short* _x0 = NULL, size_t _max_iter = 10000):kmc(_lambda_min, _lambda_max), lambda_min(_lambda_min), lambda_max(_lambda_max), N(_N), minimizer(_m), max_iter(_max_iter) 
     {
-        short_array x0( new Short[N] );
+        short_array x0( new short[N] );
         if(_x0 != NULL )
         {
             for(size_t i = 0; i < N; i++) // copy
@@ -58,8 +57,10 @@ class ApproximateES
         labelings.push_back( x0 );
     }
 
-    bool compare(const short_array& s1, const short_array& s2)
+    bool compare(const short_array& s1, const short_array& s2, float lambda)
     {
+        if(lambda == lambda_min || lambda == lambda_max)
+            return false;
         for(size_t i = 0; i < N; i++)
         {
             if( s1[i] != s2[i] )
@@ -72,7 +73,7 @@ class ApproximateES
     void loop()
     {
         size_t iter = 0;
-        while( !Lambda.empty() && iter < max_iter)
+        while( (!Lambda.empty()) && (iter < max_iter) )
         {
             Undefined u = Lambda.front();
             Lambda.pop();
@@ -88,7 +89,7 @@ class ApproximateES
                 min_x = x2;
             }
 
-            if( !compare( min_x, u.x_l) && !compare(min_x, u.x_r) )
+            if( !compare( min_x, u.x_l, u.lambda) && !compare(min_x, u.x_r, u.lambda) )
             {
                 LineSegment l( min_m, min_b, lambda_min, lambda_max, false );
                 kmc.addLineSegment(l);
@@ -121,7 +122,7 @@ class ApproximateES
         cout<<"labelings:"<<endl;
         for(size_t i = 0; i < labelings.size(); i++)
         {
-            cout<<labelings[i][0].x<<" ";
+            cout<<labelings[i][0]<<" ";
         }
         cout<<endl;
     }

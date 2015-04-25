@@ -1,6 +1,7 @@
 #pragma once
+#include <boost/shared_array.hpp>
 
-#include "Short.hpp"
+typedef boost::shared_array<short> short_array;
 
 class EnergyMinimizer
 {
