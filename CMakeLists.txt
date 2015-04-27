@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 2.8)
 
-project(myapp)
-
+project(approximateES)
+find_package( OpenCV REQUIRED )
 add_subdirectory(libgco)
 include_directories(libgco)
-add_executable(myapp example.cpp)
-target_link_libraries(myapp gco)
+add_executable(approximateES example-gco.cpp)
+target_link_libraries(approximateES libgco ${OpenCV_LIBS})
 
-install(TARGETS myapp DESTINATION bin)
+install(TARGETS approximateES DESTINATION bin)
