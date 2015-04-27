@@ -41,12 +41,11 @@ class ApproximateES
     ApproximateES(size_t _N, float _lambda_min, float _lambda_max, EnergyMinimizer* _m ,short* _x0 = NULL, size_t _max_iter = 10000):kmc(_lambda_min, _lambda_max), lambda_min(_lambda_min), lambda_max(_lambda_max), N(_N), minimizer(_m), max_iter(_max_iter) 
     {
         short_array x0( new short[N] );
-        if(_x0 != NULL )
+        for(size_t i = 0; i < N; i++) // copy
         {
-            for(size_t i = 0; i < N; i++) // copy
-            {
+            if(_x0 != NULL )
                 x0[i] = _x0[i];
-            }
+            else x0[i] = 0;
         }
         Undefined u1(lambda_min, x0, x0);
         Undefined u2(lambda_max, x0, x0);
@@ -75,6 +74,7 @@ class ApproximateES
         size_t iter = 0;
         while( (!Lambda.empty()) && (iter < max_iter) )
         {
+            cout<<"Iteration: "<<iter<<endl;
             Undefined u = Lambda.front();
             Lambda.pop();
             float energy2, m2, b2,min_m, min_b, min_energy;
@@ -93,9 +93,11 @@ class ApproximateES
             {
                 LineSegment l( min_m, min_b, lambda_min, lambda_max, false );
                 kmc.addLineSegment(l);
+                cout<<"* Adding line segment: "<<l<<endl;
                 int num_intersections = kmc.num_intersections;
                 if( num_intersections > 1 && (kmc.intersecting_lambda[0] != kmc.intersecting_lambda[num_intersections -1] ) )
                 { // had intersections
+                    cout<<"\t Had intersections at"<< kmc.intersecting_lambda[0]<<", "<<kmc.intersecting_lambda[num_intersections-1]<<endl;
                     float lambda_l = kmc.intersecting_lambda[0];
                     float lambda_r = kmc.intersecting_lambda[num_intersections - 1];
                     int index_l = kmc.intersecting_indexes[0];
@@ -117,6 +119,8 @@ class ApproximateES
 
             iter++;
         }
+        if(iter == max_iter)
+            cout<<"Maximum number of iterations reached"<<endl;
         cout<<"Done: "<<endl;
         cout<<kmc<<endl;
         cout<<"labelings:"<<endl;
