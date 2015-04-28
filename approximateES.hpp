@@ -131,6 +131,11 @@ class ApproximateES
         cout<<endl;
     }
 
+    vector<short_array> getLabelings()
+    {
+        return labelings;
+    }
+
     ~ApproximateES()
     {
     }

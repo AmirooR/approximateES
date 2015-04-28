@@ -3,7 +3,11 @@
 #include "GCoptimization.h"
 #include <vector>
 #include <cmath>
+#include <string>
+#include <sstream>
 
+#define SSTR( x ) dynamic_cast< std::ostringstream & >( \
+                ( std::ostringstream() << std::dec << x ) ).str()
 using namespace std;
 using namespace cv;
 
@@ -49,15 +53,21 @@ class FgBgGCEnergyMinimizer: public EnergyMinimizer
                     gc->setLabel(y*width+x, (int) input[y*width+x] );// initialize labeling by input
                     for(int l = 0; l < num_labels; l++)
                     {
-                        float data_ = fg;
-                        if(l == 1) data_ = bg;
-                        float cost = (img1F.at<float>(y,x) - data_)*(img1F.at<float>(y,x) - data_);
-                        cout<<"cost @("<<x<<", "<<y<<") label: "<<l<<" is "<<cost<<endl;
+                        //float cost = fabs(img1F.at<float>(y,x) - data_);//*(img1F.at<float>(y,x) - data_);
+                        float cost = fabs(img1F.at<float>(y,x)-fg);//fabs(img1F.at<float>(y,x)-fg);
+                        if( l == 1 )
+                        {
+                            cost = fabs(img1F.at<float>(y,x) - (1.0f+3.0f/7.0f) );//fabs(img1F.at<float>(y,x)-bg);
+                            float cost2 = fabs(img1F.at<float>(y,x) + 2.0f/7.0f);
+                            cost = cost < cost2 ? cost : cost2;
+                            cost = cost * cost;
+                        }
+                        //cost = cost * cost;
+                        //cout<<"cost @("<<x<<", "<<y<<") = "<< img1F.at<float>(y,x)<<" label: "<<l<<" is "<<cost<<endl;
                         gc->setDataCost(y*width + x, l, (c+lambda*d)*cost);
                     }
                 }
             }
-            cout<<"Smoothness: "<<endl;
 
             for(int l1 = 0; l1 < num_labels; l1++)
                 for(int l2 = 0; l2 < num_labels; l2++)
@@ -74,6 +84,9 @@ class FgBgGCEnergyMinimizer: public EnergyMinimizer
                 output[i] = (short)gc->whatLabel(i);
             }
 
+            cout<<"Data term: "<<gc->giveDataEnergy() << endl;
+            cout<<"Smooth term: "<<gc->giveSmoothEnergy() <<endl;
+
             m = d * gc->giveDataEnergy() / (c+lambda*d);
             b = c * gc->giveDataEnergy() / (c+lambda*d) + gc->giveSmoothEnergy();
             energy = m * lambda + b;
@@ -86,6 +99,9 @@ class FgBgGCEnergyMinimizer: public EnergyMinimizer
 
         return output;
     }
+
+    int getWidth(){return width;}
+    int getHeight(){return height;}
 
         
     virtual ~FgBgGCEnergyMinimizer()
@@ -100,9 +116,29 @@ class FgBgGCEnergyMinimizer: public EnergyMinimizer
 int main()
 {
     
-    FgBgGCEnergyMinimizer* e = new FgBgGCEnergyMinimizer("grays.png", 0.5f, 0.0f, 1.0f, 1.0f);
-    ApproximateES aes(e->getNumberOfVariables(), 0.0,100.0, e, NULL, 200);
+    FgBgGCEnergyMinimizer* e = new FgBgGCEnergyMinimizer("grays.png", 0.5714f, 0.784f, 0.0f,1.0f);
+    ApproximateES aes(e->getNumberOfVariables(), 0.001, 1.0, e, NULL, 200);
     aes.loop();
+    vector<short_array> labelings = aes.getLabelings();
+    for(size_t i = 0; i < labelings.size(); i++)
+    {
+        Mat m = Mat::zeros(e->getHeight(), e->getWidth(), CV_8UC3);
+        for(int y = 0; y < e->getHeight(); y++)
+        {
+            for(int x = 0; x < e->getWidth(); x++)
+            {
+                if( labelings[i][ y*(e->getWidth()) + x] == 0 ) //fg
+                {
+                    m.at<Vec3b>(y,x) = Vec3b(255,255,255);
+                }
+            }
+        }
+
+        string out("_output.png");
+        string s = SSTR( i ) + out;
+        imwrite(s.c_str(), m);
+    }
+
     delete e;
     return 0;
 }
