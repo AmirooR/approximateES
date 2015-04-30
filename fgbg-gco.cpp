@@ -50,7 +50,8 @@ class FgBgGCEnergyMinimizer: public EnergyMinimizer
             {
                 for(int x = 0; x < width; x++)
                 {
-                    gc->setLabel(y*width+x, (int) input[y*width+x] );// initialize labeling by input
+                    //gc->setLabel(y*width+x, (int) input[y*width+x] );// initialize labeling by input
+                    gc->setLabel(y*width+x, 0);
                     for(int l = 0; l < num_labels; l++)
                     {
                         //float cost = fabs(img1F.at<float>(y,x) - data_);//*(img1F.at<float>(y,x) - data_);

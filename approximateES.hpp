@@ -97,7 +97,9 @@ class ApproximateES
                 int num_intersections = kmc.num_intersections;
                 if( num_intersections > 1 && (kmc.intersecting_lambda[0] != kmc.intersecting_lambda[num_intersections -1] ) )
                 { // had intersections
-                    cout<<"\t Had intersections at"<< kmc.intersecting_lambda[0]<<", "<<kmc.intersecting_lambda[num_intersections-1]<<endl;
+                    cout.precision(8);
+                    cout<<"\t Had intersections at "<< kmc.intersecting_lambda[0]<<", "<<kmc.intersecting_lambda[num_intersections-1]<<endl;                    
+                    cout<<"\t\t Energies are: "<< fixed << kmc.intersecting_energies[0]<<", "<<fixed<<kmc.intersecting_energies[num_intersections-1]<<endl;
                     float lambda_l = kmc.intersecting_lambda[0];
                     float lambda_r = kmc.intersecting_lambda[num_intersections - 1];
                     int index_l = kmc.intersecting_indexes[0];
