@@ -89,7 +89,7 @@ class ApproximateES
                 min_x = x2;
             }
 
-            if( !compare( min_x, u.x_l, u.lambda) && !compare(min_x, u.x_r, u.lambda) )
+            //if( !compare( min_x, u.x_l, u.lambda) && !compare(min_x, u.x_r, u.lambda) )
             {
                 LineSegment l( min_m, min_b, lambda_min, lambda_max, false );
                 kmc.addLineSegment(l);
@@ -115,9 +115,9 @@ class ApproximateES
                     
                 }
             }
-            else
-            {
-            }
+            //else
+            //{
+            //}
 
             iter++;
         }
