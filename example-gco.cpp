@@ -15,19 +15,19 @@ class StereoGCEnergyMinimizer: public EnergyMinimizer
     size_t max_disp;
     size_t number_of_vars; 
     int width, height, num_labels;
-    float smooth_mult;
+    double smooth_mult;
     GCoptimizationGridGraph *gc;
-    float c, d;
+    double c, d;
 
     public:
-    StereoGCEnergyMinimizer(const char* input_img1, const char* input_img2, size_t max_disp = 8, float c = 1.0f, float d = 1.0f, float smooth_mult = 5.0f):max_disp(max_disp), c(c), d(d), smooth_mult(smooth_mult), gc(NULL)
+    StereoGCEnergyMinimizer(const char* input_img1, const char* input_img2, size_t max_disp = 8, double c = 1.0f, double d = 1.0f, double smooth_mult = 5.0f):max_disp(max_disp), c(c), d(d), smooth_mult(smooth_mult), gc(NULL)
     {
         img1 = imread(input_img1);
         img2 = imread(input_img2);
 
         Mat img1F, img2F;
-        img1.convertTo( img1F, CV_32FC3);
-        img2.convertTo( img2F, CV_32FC3);
+        img1.convertTo( img1F, CV_64FC3);
+        img2.convertTo( img2F, CV_64FC3);
         img1F = img1F / 255.0f;
         img2F = img2F / 255.0f;
         stereo_unaries( img1F, img2F);
@@ -44,7 +44,7 @@ class StereoGCEnergyMinimizer: public EnergyMinimizer
         return number_of_vars;
     }
 
-    virtual short_array minimize(short_array input, float lambda, float& energy, float &m, float& b)
+    virtual short_array minimize(short_array input, double lambda, double& energy, double &m, double& b)
     {
         short_array output(new short[number_of_vars]);
         try
@@ -58,7 +58,7 @@ class StereoGCEnergyMinimizer: public EnergyMinimizer
                     gc->setLabel(y*width+x, (int) input[y*width+x] );// initialize labeling by input
                     for(int l = 0; l < num_labels; l++)
                     {
-                        gc->setDataCost(y*width + x, l, (c+lambda*d)*diffs[l].at<float>(y,x));
+                        gc->setDataCost(y*width + x, l, (c+lambda*d)*diffs[l].at<double>(y,x));
                     }
                 }
             }

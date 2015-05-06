@@ -33,15 +33,15 @@ unsigned char * colorize( const short * map, int W, int H ){
 }
 
 // Certainty that the groundtruth is correct
-//float a = 1.0, b = 1.0, lambda = 0.0;
+//double a = 1.0, b = 1.0, lambda = 0.0;
 
 
 // Simple classifier that is 50% certain that the annotation is correct
-float * classify( const unsigned char * im, int W, int H, int M, float GT_PROB){
-	const float u_energy = -log( 1.0f / M );
-	const float n_energy = -log( (1.0f - GT_PROB) / (M-1) );
-	const float p_energy = -log( GT_PROB );
-	float * res = new float[W*H*M];
+double * classify( const unsigned char * im, int W, int H, int M, double GT_PROB){
+	const double u_energy = -log( 1.0f / M );
+	const double n_energy = -log( (1.0f - GT_PROB) / (M-1) );
+	const double p_energy = -log( GT_PROB );
+	double * res = new double[W*H*M];
 	for( int k=0; k<W*H; k++ ){
 		// Map the color to a label
 		int c = getColor( im + 3*k );
@@ -55,7 +55,7 @@ float * classify( const unsigned char * im, int W, int H, int M, float GT_PROB){
 		}
 		
 		// Set the energy
-		float * r = res + k*M;
+		double * r = res + k*M;
 		if (c){
 			for( int j=0; j<M; j++ )
 				r[j] = n_energy;
@@ -75,15 +75,15 @@ class FgBgDataGCEnergyMinimizer: public EnergyMinimizer
     size_t number_of_vars; 
     int width, height, num_labels;
     GCoptimizationGridGraph *gc;
-    float c, d;
+    double c, d;
 
     unsigned char* im;
     unsigned char* anno;
-    float* unary;
-    float GT_PROB;
+    double* unary;
+    double GT_PROB;
 
     public:
-    FgBgDataGCEnergyMinimizer(const char* input_im, const char* input_anno,float GT_PROB=0.5, float c = 1.0f, float d = 1.0f): GT_PROB(GT_PROB),c(c), d(d), gc(NULL)
+    FgBgDataGCEnergyMinimizer(const char* input_im, const char* input_anno,double GT_PROB=0.5, double c = 1.0f, double d = 1.0f): GT_PROB(GT_PROB),c(c), d(d), gc(NULL)
     {
         // Number of labels
         // Load the color image and some crude annotations (which are used in a simple classifier)
@@ -121,7 +121,7 @@ class FgBgDataGCEnergyMinimizer: public EnergyMinimizer
         return number_of_vars;
     }
 
-    virtual short_array minimize(short_array input, float lambda, float& energy, float &m, float& b)
+    virtual short_array minimize(short_array input, double lambda, double& energy, double &m, double& b)
     {
         short_array output(new short[number_of_vars]);
         try
@@ -135,7 +135,7 @@ class FgBgDataGCEnergyMinimizer: public EnergyMinimizer
                     gc->setLabel(y*width+x, 0);
                     for(int l = 0; l < num_labels; l++)
                     {
-                        float cost = unary[ ((y*width)+x)*num_labels + l];
+                        double cost = unary[ ((y*width)+x)*num_labels + l];
                         gc->setDataCost(y*width + x, l, (c+lambda*d)*cost);
                     }
                 }

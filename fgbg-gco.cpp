@@ -17,16 +17,16 @@ class FgBgGCEnergyMinimizer: public EnergyMinimizer
     size_t number_of_vars; 
     int width, height, num_labels;
     GCoptimizationGridGraph *gc;
-    float c, d;
-    float bg;
-    float fg;
+    double c, d;
+    double bg;
+    double fg;
     Mat img1F;
 
     public:
-    FgBgGCEnergyMinimizer(const char* input_img1, float fg = 0.0f, float bg = 1.0f, float c = 1.0f, float d = 1.0f):fg(fg), bg(bg), c(c), d(d), gc(NULL)
+    FgBgGCEnergyMinimizer(const char* input_img1, double fg = 0.0f, double bg = 1.0f, double c = 1.0f, double d = 1.0f):fg(fg), bg(bg), c(c), d(d), gc(NULL)
     {
         img1 = imread(input_img1, 0);
-        img1.convertTo( img1F, CV_32FC1);
+        img1.convertTo( img1F, CV_64FC1);
         img1F = img1F / 255.0f;
         width = img1.cols;
         height = img1.rows;
@@ -40,7 +40,7 @@ class FgBgGCEnergyMinimizer: public EnergyMinimizer
         return number_of_vars;
     }
 
-    virtual short_array minimize(short_array input, float lambda, float& energy, float &m, float& b)
+    virtual short_array minimize(short_array input, double lambda, double& energy, double &m, double& b)
     {
         short_array output(new short[number_of_vars]);
         try
@@ -54,17 +54,17 @@ class FgBgGCEnergyMinimizer: public EnergyMinimizer
                     gc->setLabel(y*width+x, 0);
                     for(int l = 0; l < num_labels; l++)
                     {
-                        //float cost = fabs(img1F.at<float>(y,x) - data_);//*(img1F.at<float>(y,x) - data_);
-                        float cost = fabs(img1F.at<float>(y,x)-fg);//fabs(img1F.at<float>(y,x)-fg);
+                        //double cost = fabs(img1F.at<double>(y,x) - data_);//*(img1F.at<double>(y,x) - data_);
+                        double cost = fabs(img1F.at<double>(y,x)-fg);//fabs(img1F.at<double>(y,x)-fg);
                         if( l == 1 )
                         {
-                            cost = fabs(img1F.at<float>(y,x) - (1.0f+3.0f/7.0f) );//fabs(img1F.at<float>(y,x)-bg);
-                            float cost2 = fabs(img1F.at<float>(y,x) + 2.0f/7.0f);
+                            cost = fabs(img1F.at<double>(y,x) - (1.0f+3.0f/7.0f) );//fabs(img1F.at<double>(y,x)-bg);
+                            double cost2 = fabs(img1F.at<double>(y,x) + 2.0f/7.0f);
                             cost = cost < cost2 ? cost : cost2;
                             cost = cost * cost;
                         }
                         //cost = cost * cost;
-                        //cout<<"cost @("<<x<<", "<<y<<") = "<< img1F.at<float>(y,x)<<" label: "<<l<<" is "<<cost<<endl;
+                        //cout<<"cost @("<<x<<", "<<y<<") = "<< img1F.at<double>(y,x)<<" label: "<<l<<" is "<<cost<<endl;
                         gc->setDataCost(y*width + x, l, (c+lambda*d)*cost);
                     }
                 }

@@ -6,10 +6,10 @@
 
 typedef struct Undefined
 {
-    float lambda;
+    double lambda;
     short_array x_l;
     short_array x_r;
-    Undefined(float _lambda, short_array _x_l, short_array _x_r):lambda(_lambda),x_l(_x_l),x_r(_x_r)
+    Undefined(double _lambda, short_array _x_l, short_array _x_r):lambda(_lambda),x_l(_x_l),x_r(_x_r)
     {
     }
 }Undefined;
@@ -17,9 +17,9 @@ typedef struct Undefined
 // I think there is no need to store \Lambda^\star
 /*typedef struct Defined
 {
-    float lambda;
+    double lambda;
     short_array x;
-    Defined(float _lambda, short_array _x):lambda(_lambda),x(_x)
+    Defined(double _lambda, short_array _x):lambda(_lambda),x(_x)
     {
     }
 }Defined;*/
@@ -29,7 +29,7 @@ class ApproximateES
 {
     vector<short_array> labelings; // labelings aligned with KeepMeConcave::segments
     KeepMeConcave kmc;
-    float lambda_min, lambda_max;
+    double lambda_min, lambda_max;
     size_t N; // number of variables
     queue<Undefined> Lambda;
     //vector<Defined> LambdaStar;
@@ -38,7 +38,7 @@ class ApproximateES
     size_t max_iter;
 
     public:
-    ApproximateES(size_t _N, float _lambda_min, float _lambda_max, EnergyMinimizer* _m ,short* _x0 = NULL, size_t _max_iter = 10000):kmc(_lambda_min, _lambda_max), lambda_min(_lambda_min), lambda_max(_lambda_max), N(_N), minimizer(_m), max_iter(_max_iter) 
+    ApproximateES(size_t _N, double _lambda_min, double _lambda_max, EnergyMinimizer* _m ,short* _x0 = NULL, size_t _max_iter = 10000):kmc(_lambda_min, _lambda_max), lambda_min(_lambda_min), lambda_max(_lambda_max), N(_N), minimizer(_m), max_iter(_max_iter) 
     {
         short_array x0( new short[N] );
         for(size_t i = 0; i < N; i++) // copy
@@ -56,7 +56,7 @@ class ApproximateES
         labelings.push_back( x0 );
     }
 
-    bool compare(const short_array& s1, const short_array& s2, float lambda)
+    bool compare(const short_array& s1, const short_array& s2, double lambda)
     {
         if(lambda == lambda_min || lambda == lambda_max)
             return false;
@@ -77,7 +77,7 @@ class ApproximateES
             cout<<"Iteration: "<<iter<<endl;
             Undefined u = Lambda.front();
             Lambda.pop();
-            float energy2, m2, b2,min_m, min_b, min_energy;
+            double energy2, m2, b2,min_m, min_b, min_energy;
             short_array min_x = minimizer->minimize( u.x_l, u.lambda, min_energy, min_m, min_b);
             short_array x2 = minimizer->minimize( u.x_r, u.lambda, energy2, m2, b2);
                         
@@ -100,8 +100,8 @@ class ApproximateES
                     cout.precision(8);
                     cout<<"\t Had intersections at "<< kmc.intersecting_lambda[0]<<", "<<kmc.intersecting_lambda[num_intersections-1]<<endl;                    
                     cout<<"\t\t Energies are: "<< fixed << kmc.intersecting_energies[0]<<", "<<fixed<<kmc.intersecting_energies[num_intersections-1]<<endl;
-                    float lambda_l = kmc.intersecting_lambda[0];
-                    float lambda_r = kmc.intersecting_lambda[num_intersections - 1];
+                    double lambda_l = kmc.intersecting_lambda[0];
+                    double lambda_r = kmc.intersecting_lambda[num_intersections - 1];
                     int index_l = kmc.intersecting_indexes[0];
                     int index_r = kmc.intersecting_indexes[num_intersections - 1];
                     if(index_r - index_l > 1 )

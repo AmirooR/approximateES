@@ -169,8 +169,8 @@ public:
 #endif
 	typedef int EnergyTermType;    // 32-bit energy terms
 #endif*/
-    typedef float EnergyTermType;
-    typedef float EnergyType;
+    typedef double EnergyTermType;
+    typedef double EnergyType;
 	typedef Energy<EnergyTermType,EnergyTermType,EnergyType> EnergyT;
 	typedef EnergyT::Var VarID;
 	typedef int LabelID;                     // Type for labels
