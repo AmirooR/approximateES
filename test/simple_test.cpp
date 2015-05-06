@@ -9,7 +9,7 @@ class TestEnergyMinimizer: public EnergyMinimizer
     {
     }
     
-    virtual short_array minimize(short_array input, float lambda, float& energy, float &m, float& b)
+    virtual short_array minimize(short_array input, double lambda, double& energy, double &m, double& b)
     {
         short_array x( new short[1] );
         if( lambda <= -0.5 )
