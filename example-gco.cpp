@@ -20,7 +20,7 @@ class StereoGCEnergyMinimizer: public EnergyMinimizer
     double c, d;
 
     public:
-    StereoGCEnergyMinimizer(const char* input_img1, const char* input_img2, size_t max_disp = 8, double c = 1.0f, double d = 1.0f, double smooth_mult = 5.0f):max_disp(max_disp), c(c), d(d), smooth_mult(smooth_mult), gc(NULL)
+    StereoGCEnergyMinimizer(const char* input_img1, const char* input_img2, size_t max_disp = 8, double c = 1.0, double d = 1.0, double smooth_mult = 5.0):max_disp(max_disp), c(c), d(d), smooth_mult(smooth_mult), gc(NULL)
     {
         img1 = imread(input_img1);
         img2 = imread(input_img2);
@@ -28,8 +28,8 @@ class StereoGCEnergyMinimizer: public EnergyMinimizer
         Mat img1F, img2F;
         img1.convertTo( img1F, CV_64FC3);
         img2.convertTo( img2F, CV_64FC3);
-        img1F = img1F / 255.0f;
-        img2F = img2F / 255.0f;
+        img1F = img1F / 255.0;
+        img2F = img2F / 255.0;
         stereo_unaries( img1F, img2F);
         width = diffs[0].cols;
         height = diffs[0].rows;
@@ -135,7 +135,7 @@ class StereoGCEnergyMinimizer: public EnergyMinimizer
 
 int main()
 {
-    StereoGCEnergyMinimizer* e = new StereoGCEnergyMinimizer("scene1.row3.col1.ppm", "scene1.row3.col2.ppm",  8, 100.0, 1.0f, 5.0f);
+    StereoGCEnergyMinimizer* e = new StereoGCEnergyMinimizer("scene1.row3.col1.ppm", "scene1.row3.col2.ppm",  8, 100.0, 1.0, 5.0);
     ApproximateES aes(e->getNumberOfVariables(), -10.0,10.0, e, NULL, 200);
     aes.loop();
     delete e;

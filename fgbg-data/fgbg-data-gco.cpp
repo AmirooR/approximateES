@@ -38,8 +38,8 @@ unsigned char * colorize( const short * map, int W, int H ){
 
 // Simple classifier that is 50% certain that the annotation is correct
 double * classify( const unsigned char * im, int W, int H, int M, double GT_PROB){
-	const double u_energy = -log( 1.0f / M );
-	const double n_energy = -log( (1.0f - GT_PROB) / (M-1) );
+	const double u_energy = -log( 1.0 / M );
+	const double n_energy = -log( (1.0 - GT_PROB) / (M-1) );
 	const double p_energy = -log( GT_PROB );
 	double * res = new double[W*H*M];
 	for( int k=0; k<W*H; k++ ){
@@ -83,7 +83,7 @@ class FgBgDataGCEnergyMinimizer: public EnergyMinimizer
     double GT_PROB;
 
     public:
-    FgBgDataGCEnergyMinimizer(const char* input_im, const char* input_anno,double GT_PROB=0.5, double c = 1.0f, double d = 1.0f): GT_PROB(GT_PROB),c(c), d(d), gc(NULL)
+    FgBgDataGCEnergyMinimizer(const char* input_im, const char* input_anno,double GT_PROB=0.5, double c = 1.0, double d = 1.0): GT_PROB(GT_PROB),c(c), d(d), gc(NULL)
     {
         // Number of labels
         // Load the color image and some crude annotations (which are used in a simple classifier)

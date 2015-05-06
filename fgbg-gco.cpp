@@ -23,11 +23,11 @@ class FgBgGCEnergyMinimizer: public EnergyMinimizer
     Mat img1F;
 
     public:
-    FgBgGCEnergyMinimizer(const char* input_img1, double fg = 0.0f, double bg = 1.0f, double c = 1.0f, double d = 1.0f):fg(fg), bg(bg), c(c), d(d), gc(NULL)
+    FgBgGCEnergyMinimizer(const char* input_img1, double fg = 0.0, double bg = 1.0, double c = 1.0, double d = 1.0):fg(fg), bg(bg), c(c), d(d), gc(NULL)
     {
         img1 = imread(input_img1, 0);
         img1.convertTo( img1F, CV_64FC1);
-        img1F = img1F / 255.0f;
+        img1F = img1F / 255.0;
         width = img1.cols;
         height = img1.rows;
         num_labels = 2;
@@ -58,8 +58,8 @@ class FgBgGCEnergyMinimizer: public EnergyMinimizer
                         double cost = fabs(img1F.at<double>(y,x)-fg);//fabs(img1F.at<double>(y,x)-fg);
                         if( l == 1 )
                         {
-                            cost = fabs(img1F.at<double>(y,x) - (1.0f+3.0f/7.0f) );//fabs(img1F.at<double>(y,x)-bg);
-                            double cost2 = fabs(img1F.at<double>(y,x) + 2.0f/7.0f);
+                            cost = fabs(img1F.at<double>(y,x) - (10.0/7.0) );//fabs(img1F.at<double>(y,x)-bg);
+                            double cost2 = fabs(img1F.at<double>(y,x) + 2.0/7.0);
                             cost = cost < cost2 ? cost : cost2;
                             cost = cost * cost;
                         }
@@ -117,7 +117,7 @@ class FgBgGCEnergyMinimizer: public EnergyMinimizer
 int main()
 {
     
-    FgBgGCEnergyMinimizer* e = new FgBgGCEnergyMinimizer("grays.png", 0.5714f, 0.784f, 0.0f,1.0f);
+    FgBgGCEnergyMinimizer* e = new FgBgGCEnergyMinimizer("grays.png", 4.0/7.0, 0.784, 0.0,1.0);
     ApproximateES aes(e->getNumberOfVariables(), 0.001, 1.0, e, NULL, 200);
     aes.loop();
     vector<short_array> labelings = aes.getLabelings();
