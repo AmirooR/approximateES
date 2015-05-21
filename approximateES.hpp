@@ -139,7 +139,7 @@ class ApproximateES
         }
         if(iter == max_iter)
             cout<<"Maximum number of iterations reached"<<endl;
-        cout<<"Done: "<<endl;
+        cout<<"Done in "<<iter<<" iterations."<<endl;
         if(verbosity >= 1)
             cout<<kmc<<endl;
         if(verbosity >= 2)

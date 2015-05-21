@@ -50,6 +50,7 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
     double lambda2;
     double beta;
     int m_counter;
+    double *unaries;
 
   protected:
     
@@ -85,7 +86,8 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
         d(d),
         beta(1.0),
         m_counter(0), 
-        gc(NULL)
+        gc(NULL),
+        unaries(NULL)
     {
         img1 = imread(input_img1, 0);
         img1.convertTo( img1F, CV_64FC1);
@@ -96,11 +98,32 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
         number_of_vars = (size_t) width*height;
         gc = new GCoptimizationGridGraph(width, height, num_labels);
         computeBeta();
+        unaries = new double[width*height*num_labels];
+        set_unaries();
     }
     
     size_t getNumberOfVariables()
     {
         return number_of_vars;
+    }
+
+    void set_unaries()
+    {
+        for( int y = 0; y < height; y++)
+        {
+            for(int x = 0; x < width; x++)
+            {
+                for(int l = 0; l < num_labels; l++)
+                {
+                    double cost = fabs(img1F.at<double>(y,x)-fg);
+                    if( l == 1 )
+                    {
+                        cost = fabs(img1F.at<double>(y,x)-bg);
+                    }
+                    unaries[ (y*width+x)*num_labels + l] = cost;
+                }
+            }
+        }
     }
 
     virtual short_array minimize(short_array input, double lambda, double& energy, double &m, double& b)
@@ -114,32 +137,14 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
             {
                 for(int x = 0; x < width; x++)
                 {
-                    //gc->setLabel(y*width+x, (int) input[y*width+x] );// initialize labeling by input
                     gc->setLabel(y*width+x, 0);
                     for(int l = 0; l < num_labels; l++)
                     {
-                        //double cost = fabs(img1F.at<double>(y,x) - data_);//*(img1F.at<double>(y,x) - data_);
-                        double cost = fabs(img1F.at<double>(y,x)-fg);//fabs(img1F.at<double>(y,x)-fg);
-                        if( l == 1 )
-                        {
-                            //cost = fabs(img1F.at<double>(y,x) - (10.0/7.0) );//
-                            cost = fabs(img1F.at<double>(y,x)-bg);
-                            /*double cost2 = fabs(img1F.at<double>(y,x) + 2.0/7.0);
-                            cost = cost < cost2 ? cost : cost2;
-                            cost = cost * cost;*/
-                        }
-                        //cost = cost * cost;
-                        //cout<<"cost @("<<x<<", "<<y<<") = "<< img1F.at<double>(y,x)<<" label: "<<l<<" is "<<cost<<endl;
-                        gc->setDataCost(y*width + x, l, (c+lambda*d)*cost);
+                        gc->setDataCost(y*width + x, l, (c+lambda*d)*unaries[ (y*width+x)*num_labels + l]);
                     }
                 }
             }
 
-            /*for(int l1 = 0; l1 < num_labels; l1++)
-                for(int l2 = 0; l2 < num_labels; l2++)
-                {
-                    gc->setSmoothCost(l1,l2, fabs(l1 - l2));
-                }*/
             ForSmoothFn toFn;
             toFn.img = img1F;
             toFn.lambda1 = lambda1;
@@ -154,21 +159,35 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
             gc->expansion(1);
             if(m_counter % 100 == 0 )
                 cout<<"After optimization: energy is "<<gc->compute_energy()<<endl;
-                        
+
+            double sum_unaries = 0.0;            
             for(size_t i = 0; i < number_of_vars; i++)
             {
                 output[i] = (short)gc->whatLabel(i);
+                sum_unaries += unaries[i*num_labels + output[i]];
             }
 
             if(m_counter % 100 == 0 ) 
             {
                 cout<<"Data term: "<<gc->giveDataEnergy() << endl;
+                cout<<"Sum unaries: "<<sum_unaries<<" *(c+lambda*d) = "<<(c+lambda*d)*sum_unaries << endl;
                 cout<<"Smooth term: "<<gc->giveSmoothEnergy() <<endl;
             }
 
-            m = d * gc->giveDataEnergy() / (c+lambda*d);
-            b = c * gc->giveDataEnergy() / (c+lambda*d) + gc->giveSmoothEnergy();
-            energy = m * lambda + b;
+            /*if( (c + lambda * d ) == 0 )
+            {
+                m = 0;
+                b = 
+            }
+            else
+            {
+                m = d * gc->giveDataEnergy() / (c+lambda*d);
+                b = c * gc->giveDataEnergy() / (c+lambda*d) + gc->giveSmoothEnergy();
+                energy = m * lambda + b;
+            }*/
+
+            m = sum_unaries*d;
+            b = c*sum_unaries + gc->giveSmoothEnergy();
             if(m_counter % 100 == 0 ) 
                 cout<<"M = "<<m<<", B = "<<b<<endl;
         }
@@ -189,20 +208,30 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
     {
         if(gc)
             delete gc;
+
+        if(unaries)
+            delete[] unaries;
     }
 };
 
 
 
-int main()
+int main(int argc, char* argv[])
 {
-    FgBgSVSGCEnergyMinimizer* e = new FgBgSVSGCEnergyMinimizer("grays.jpg", /*fg*/1.0, /*bg*/0.0, /*lambda1*/0.0, /*lambda2*/10.0, /*c*/0.0,/*d*/1.0 );
+    if(argc < 2)
+    {
+        cout<<"Usage: "<<argv[0]<<" image output_dir"<<endl;
+        return 1;
+    }
+    FgBgSVSGCEnergyMinimizer* e = new FgBgSVSGCEnergyMinimizer(argv[1], /*fg*/1.0, /*bg*/0.0, /*lambda1*/0.0, /*lambda2*/10.0, /*c*/0.0,/*d*/1.0 );
     
-    ApproximateES aes(/* number of vars */ e->getNumberOfVariables(),/*lambda_min */ 0.001,/* lambda_max*/ 100.0, /* energy_minimizer */e,/* x0 */ NULL, /*max_iter */10000,/*verbosity*/ 0);
+    ApproximateES aes(/* number of vars */ e->getNumberOfVariables(),/*lambda_min */ 0.000,/* lambda_max*/ 1000.0, /* energy_minimizer */e,/* x0 */ NULL, /*max_iter */10000,/*verbosity*/ 0);
    
     aes.loop();
     vector<short_array> labelings = aes.getLabelings();
-    aes.writeLambdas("lambdas.txt");
+    string out_dir(argv[2]);
+    string lambdas_file = out_dir + string("lambdas.txt");
+    aes.writeLambdas(lambdas_file.c_str());
     
     for(size_t i = 0; i < labelings.size(); i++)
     {
@@ -219,7 +248,7 @@ int main()
         }
 
         string out("_output.png");
-        string s = SSTR( i ) + out;
+        string s = out_dir + SSTR( i ) + out;
         imwrite(s.c_str(), m);
     }
 
