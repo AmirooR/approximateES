@@ -3,6 +3,7 @@
 #include "keep-me-concave/keep_me_concave.hpp"
 #include <queue>
 #include "EnergyMinimizer.hpp"
+#include <stdio.h>
 
 typedef struct Undefined
 {
@@ -34,11 +35,18 @@ class ApproximateES
     queue<Undefined> Lambda;
     //vector<Defined> LambdaStar;
     EnergyMinimizer* minimizer;
-
     size_t max_iter;
+    int verbosity;
 
     public:
-    ApproximateES(size_t _N, double _lambda_min, double _lambda_max, EnergyMinimizer* _m ,short* _x0 = NULL, size_t _max_iter = 10000):kmc(_lambda_min, _lambda_max), lambda_min(_lambda_min), lambda_max(_lambda_max), N(_N), minimizer(_m), max_iter(_max_iter) 
+    ApproximateES(size_t _N, double _lambda_min, double _lambda_max, EnergyMinimizer* _m ,short* _x0 = NULL, size_t _max_iter = 10000, int _verbosity = 0):
+        kmc(_lambda_min, _lambda_max), 
+        lambda_min(_lambda_min), 
+        lambda_max(_lambda_max), 
+        N(_N), 
+        minimizer(_m), 
+        max_iter(_max_iter), 
+        verbosity(_verbosity) 
     {
         short_array x0( new short[N] );
         for(size_t i = 0; i < N; i++) // copy
@@ -74,7 +82,11 @@ class ApproximateES
         size_t iter = 0;
         while( (!Lambda.empty()) && (iter < max_iter) )
         {
-            cout<<"Iteration: "<<iter<<endl;
+            if(verbosity >= 2)
+                cout<<"Iteration: "<<iter<<endl;
+            else if(verbosity == 1 && (iter%10)==0)
+                cout<<"Iteration: "<<iter<<endl;
+
             Undefined u = Lambda.front();
             Lambda.pop();
             double energy2, m2, b2,min_m, min_b, min_energy;
@@ -93,13 +105,17 @@ class ApproximateES
             {
                 LineSegment l( min_m, min_b, lambda_min, lambda_max, false );
                 kmc.addLineSegment(l);
-                cout<<"* Adding line segment: "<<l<<endl;
+                if(verbosity >= 2)
+                    cout<<"* Adding line segment: "<<l<<endl;
                 int num_intersections = kmc.num_intersections;
                 if( num_intersections > 1 && (kmc.intersecting_lambda[0] != kmc.intersecting_lambda[num_intersections -1] ) )
                 { // had intersections
                     cout.precision(8);
-                    cout<<"\t Had intersections at "<< kmc.intersecting_lambda[0]<<", "<<kmc.intersecting_lambda[num_intersections-1]<<endl;                    
-                    cout<<"\t\t Energies are: "<< fixed << kmc.intersecting_energies[0]<<", "<<fixed<<kmc.intersecting_energies[num_intersections-1]<<endl;
+                    if(verbosity >= 1)
+                    {
+                        cout<<"\t Had intersections at "<< kmc.intersecting_lambda[0]<<", "<<kmc.intersecting_lambda[num_intersections-1]<<endl; 
+                        cout<<"\t\t Energies are: "<< fixed << kmc.intersecting_energies[0]<<", "<<fixed<<kmc.intersecting_energies[num_intersections-1]<<endl;
+                    }
                     double lambda_l = kmc.intersecting_lambda[0];
                     double lambda_r = kmc.intersecting_lambda[num_intersections - 1];
                     int index_l = kmc.intersecting_indexes[0];
@@ -124,18 +140,45 @@ class ApproximateES
         if(iter == max_iter)
             cout<<"Maximum number of iterations reached"<<endl;
         cout<<"Done: "<<endl;
-        cout<<kmc<<endl;
-        cout<<"labelings:"<<endl;
-        for(size_t i = 0; i < labelings.size(); i++)
+        if(verbosity >= 1)
+            cout<<kmc<<endl;
+        if(verbosity >= 2)
         {
-            cout<<labelings[i][0]<<" ";
+            cout<<"labelings:"<<endl;
+            for(size_t i = 0; i < labelings.size(); i++)
+            {
+                cout<<labelings[i][0]<<" ";
+            }
+            cout<<endl;
         }
-        cout<<endl;
+    }
+
+    void writeLambdas(const char* filename)
+    {
+        FILE* fp = fopen(filename,"w");
+        if(!fp)
+        {
+            cerr<<"Error in openning file "<<filename<<endl;
+            return;
+        }
+        vector<LineSegment> segments = kmc.getSegments();
+        size_t i = 0;
+        for(i = 0; i < segments.size(); i++)
+        {
+            fprintf(fp, "%.8f\n", segments[i].lambda_min);
+        }
+        fprintf(fp, "%.8f\n", segments[i-1].lambda_max);
+        fclose(fp);
     }
 
     vector<short_array> getLabelings()
     {
         return labelings;
+    }
+
+    KeepMeConcave getKMC()
+    {
+        return kmc;
     }
 
     ~ApproximateES()

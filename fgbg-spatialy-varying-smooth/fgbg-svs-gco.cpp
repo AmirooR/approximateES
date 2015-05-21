@@ -49,6 +49,7 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
     double lambda1;
     double lambda2;
     double beta;
+    int m_counter;
 
   protected:
     
@@ -82,7 +83,8 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
         lambda2(lambda2), 
         c(c), 
         d(d),
-        beta(1.0), 
+        beta(1.0),
+        m_counter(0), 
         gc(NULL)
     {
         img1 = imread(input_img1, 0);
@@ -106,7 +108,8 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
         short_array output(new short[number_of_vars]);
         try
         {
-            cout<<"Lambda: "<<lambda<<endl;
+            if(m_counter % 100 == 0 ) 
+                cout<<"Lambda: "<<lambda<<endl;
             for( int y = 0; y < height; y++)
             {
                 for(int x = 0; x < width; x++)
@@ -146,28 +149,35 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
             toFn.beta = beta;
             gc->setSmoothCost(&smoothFn, &toFn);
 
-            cout<<"Before optimization: energy is "<<gc->compute_energy()<<endl;
+            if(m_counter % 100 == 0 ) 
+                cout<<"Before optimization: energy is "<<gc->compute_energy()<<endl;
             gc->expansion(1);
-            cout<<"After optimization: energy is "<<gc->compute_energy()<<endl;
+            if(m_counter % 100 == 0 )
+                cout<<"After optimization: energy is "<<gc->compute_energy()<<endl;
                         
             for(size_t i = 0; i < number_of_vars; i++)
             {
                 output[i] = (short)gc->whatLabel(i);
             }
 
-            cout<<"Data term: "<<gc->giveDataEnergy() << endl;
-            cout<<"Smooth term: "<<gc->giveSmoothEnergy() <<endl;
+            if(m_counter % 100 == 0 ) 
+            {
+                cout<<"Data term: "<<gc->giveDataEnergy() << endl;
+                cout<<"Smooth term: "<<gc->giveSmoothEnergy() <<endl;
+            }
 
             m = d * gc->giveDataEnergy() / (c+lambda*d);
             b = c * gc->giveDataEnergy() / (c+lambda*d) + gc->giveSmoothEnergy();
             energy = m * lambda + b;
-            cout<<"M = "<<m<<", B = "<<b<<endl;
+            if(m_counter % 100 == 0 ) 
+                cout<<"M = "<<m<<", B = "<<b<<endl;
         }
         catch( GCException e)
         {
             e.Report();
         }
 
+        m_counter++;
         return output;
     }
 
@@ -187,9 +197,13 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
 int main()
 {
     FgBgSVSGCEnergyMinimizer* e = new FgBgSVSGCEnergyMinimizer("grays.jpg", /*fg*/1.0, /*bg*/0.0, /*lambda1*/0.0, /*lambda2*/10.0, /*c*/0.0,/*d*/1.0 );
-    ApproximateES aes(e->getNumberOfVariables(), 0.001, 100.0, e, NULL, 1000);
+    
+    ApproximateES aes(/* number of vars */ e->getNumberOfVariables(),/*lambda_min */ 0.001,/* lambda_max*/ 100.0, /* energy_minimizer */e,/* x0 */ NULL, /*max_iter */10000,/*verbosity*/ 0);
+   
     aes.loop();
     vector<short_array> labelings = aes.getLabelings();
+    aes.writeLambdas("lambdas.txt");
+    
     for(size_t i = 0; i < labelings.size(); i++)
     {
         Mat m = Mat::zeros(e->getHeight(), e->getWidth(), CV_8UC3);
