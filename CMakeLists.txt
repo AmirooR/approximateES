@@ -1,13 +1,14 @@
 cmake_minimum_required(VERSION 2.8)
-IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+#IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+IF(APPLE)
        # Mac OS X specific code
     SET(CMAKE_SYSTEM_NAME Darwin)
 
     # Add MacPorts
     INCLUDE_DIRECTORIES(/opt/local/include)
     LINK_DIRECTORIES(/opt/local/lib)
-
-ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+ENDIF(APPLE)
+#ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 project(approximateES)
 find_package( OpenCV REQUIRED )
