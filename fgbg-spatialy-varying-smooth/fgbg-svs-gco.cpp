@@ -97,7 +97,7 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
         num_labels = 2;
         number_of_vars = (size_t) width*height;
         gc = new GCoptimizationGridGraph(width, height, num_labels);
-        beta = 84.5272;//TODO: for test only; computeBeta();
+        computeBeta();
         unaries = new double[width*height*num_labels];
         set_unaries();
     }
