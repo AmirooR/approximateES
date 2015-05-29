@@ -110,7 +110,7 @@ class ApproximateES
                 int num_intersections = kmc.num_intersections;
                 if( num_intersections > 1 && (kmc.intersecting_lambda[0] != kmc.intersecting_lambda[num_intersections -1] ) )
                 { // had intersections
-                    cout.precision(8);
+                    cout.precision(16);
                     if(verbosity >= 1)
                     {
                         cout<<"\t Had intersections at "<< kmc.intersecting_lambda[0]<<", "<<kmc.intersecting_lambda[num_intersections-1]<<endl; 

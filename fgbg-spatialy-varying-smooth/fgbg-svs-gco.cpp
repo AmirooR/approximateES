@@ -131,7 +131,7 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
         short_array output(new short[number_of_vars]);
         try
         {
-            if(m_counter % 100 == 0 ) 
+            //if(m_counter % 100 == 0 ) 
                 cout<<"Lambda: "<<lambda<<endl;
             for( int y = 0; y < height; y++)
             {
