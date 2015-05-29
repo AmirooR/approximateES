@@ -163,11 +163,11 @@ class ApproximateES
         }
         vector<LineSegment> segments = kmc.getSegments();
         size_t i = 0;
-        for(i = 0; i < segments.size(); i++)
+        for(i = 1; i < segments.size(); i++)
         {
-            fprintf(fp, "%.8f\n", segments[i].lambda_min);
+            fprintf(fp, "%e\n", segments[i].lambda_min);
         }
-        fprintf(fp, "%.8f\n", segments[i-1].lambda_max);
+        //fprintf(fp, "%.8f\n", segments[i-1].lambda_max);
         fclose(fp);
     }
 

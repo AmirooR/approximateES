@@ -33,7 +33,7 @@ double smoothFn(int p1, int p2, int l1, int l2, void* data)
 
     double color_diff = fabs(myData->img.at<double>(r1,c1) - myData->img.at<double>(r2,c2));
     
-    return (myData->lambda1 + myData->lambda2*exp(-myData->beta*color_diff*color_diff));
+    return (myData->lambda1 + myData->lambda2*exp(-myData->beta*color_diff*color_diff*3.0));
 }
 
 class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
@@ -60,11 +60,11 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
         int count = 0;
         Mat hm1 = img1F;
         Mat hm2;
-        pow( hm1.rowRange(2,height) - hm1.rowRange(1,height-1), 2, hm2);
+        pow( hm1.rowRange(1,height) - hm1.rowRange(0,height-1), 2, hm2);
         count += hm2.rows * hm2.cols;
         beta += sum(hm2)[0];
 
-        pow( hm1.colRange(2,width) - hm1.colRange(1,width-1), 2, hm2);
+        pow( hm1.colRange(1,width) - hm1.colRange(0,width-1), 2, hm2);
         count += hm2.rows * hm2.cols;
         beta += sum(hm2)[0];
         double beta_inv = 2.0*(beta/count);
@@ -138,9 +138,10 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
                 for(int x = 0; x < width; x++)
                 {
                     gc->setLabel(y*width+x, 0);
+                    double hv1 = unaries[(y*width+x)*num_labels+1] - unaries[(y*width+x)*num_labels];
                     for(int l = 0; l < num_labels; l++)
                     {
-                        gc->setDataCost(y*width + x, l, (c+lambda*d)*unaries[ (y*width+x)*num_labels + l]);
+                        gc->setDataCost(y*width + x, l, hv1*lambda*l /*(c+lambda*d)*unaries[ (y*width+x)*num_labels + l]*/);
                     }
                 }
             }
@@ -164,13 +165,14 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
             for(size_t i = 0; i < number_of_vars; i++)
             {
                 output[i] = (short)gc->whatLabel(i);
-                sum_unaries += unaries[i*num_labels + output[i]];
+                if( output[i] == 1 )
+                    sum_unaries += (unaries[i*num_labels + 1] - unaries[i*num_labels]);
             }
 
             if(m_counter % 100 == 0 ) 
             {
                 cout<<"Data term: "<<gc->giveDataEnergy() << endl;
-                cout<<"Sum unaries: "<<sum_unaries<<" *(c+lambda*d) = "<<(c+lambda*d)*sum_unaries << endl;
+                cout<<"Sum unaries: "<<sum_unaries<<" *lambda = "<<lambda*sum_unaries << endl;
                 cout<<"Smooth term: "<<gc->giveSmoothEnergy() <<endl;
             }
 
@@ -186,9 +188,9 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
                 energy = m * lambda + b;
             }*/
 
-            m = sum_unaries*d;
-            b = c*sum_unaries + gc->giveSmoothEnergy();
-            if(m_counter % 100 == 0 ) 
+            m = sum_unaries;
+            b = gc->giveSmoothEnergy();
+//            if(m_counter % 100 == 0 ) 
                 cout<<"M = "<<m<<", B = "<<b<<endl;
         }
         catch( GCException e)
@@ -225,7 +227,7 @@ int main(int argc, char* argv[])
     }
     FgBgSVSGCEnergyMinimizer* e = new FgBgSVSGCEnergyMinimizer(argv[1], /*fg*/1.0, /*bg*/0.0, /*lambda1*/0.0, /*lambda2*/10.0, /*c*/0.0,/*d*/1.0 );
     
-    ApproximateES aes(/* number of vars */ e->getNumberOfVariables(),/*lambda_min */ 0.000,/* lambda_max*/ 1000.0, /* energy_minimizer */e,/* x0 */ NULL, /*max_iter */10000,/*verbosity*/ 0);
+    ApproximateES aes(/* number of vars */ e->getNumberOfVariables(),/*lambda_min */ 0.0,/* lambda_max*/ 0.0000002, /* energy_minimizer */e,/* x0 */ NULL, /*max_iter */10000,/*verbosity*/ 10);
    
     aes.loop();
     vector<short_array> labelings = aes.getLabelings();
