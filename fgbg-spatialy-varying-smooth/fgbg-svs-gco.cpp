@@ -227,7 +227,7 @@ int main(int argc, char* argv[])
     }
     FgBgSVSGCEnergyMinimizer* e = new FgBgSVSGCEnergyMinimizer(argv[1], /*fg*/1.0, /*bg*/0.0, /*lambda1*/0.0, /*lambda2*/10.0, /*c*/0.0,/*d*/1.0 );
     
-    ApproximateES aes(/* number of vars */ e->getNumberOfVariables(),/*lambda_min */ 0.0,/* lambda_max*/ 1.0, /* energy_minimizer */e,/* x0 */ NULL, /*max_iter */10000,/*verbosity*/ 10);
+    ApproximateES aes(/* number of vars */ e->getNumberOfVariables(),/*lambda_min */ 0.0,/* lambda_max*/ 0.0000002, /* energy_minimizer */e,/* x0 */ NULL, /*max_iter */10000,/*verbosity*/ 10);
    
     aes.loop();
     vector<short_array> labelings = aes.getLabelings();
