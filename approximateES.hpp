@@ -144,12 +144,12 @@ class ApproximateES
             cout<<kmc<<endl;
         if(verbosity >= 2)
         {
-            cout<<"labelings:"<<endl;
+            /*cout<<"labelings:"<<endl;
             for(size_t i = 0; i < labelings.size(); i++)
             {
                 cout<<labelings[i][0]<<" ";
             }
-            cout<<endl;
+            cout<<endl;*/
         }
     }
 

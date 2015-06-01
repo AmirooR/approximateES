@@ -52,7 +52,7 @@ void putColor( unsigned char * c, unsigned int cc ){
 	c[0] = cc&0xff; c[1] = (cc>>8)&0xff; c[2] = (cc>>16)&0xff;
 }
 // Produce a color image from a bunch of labels
-unsigned char * colorize( const short * map, int W, int H ){
+unsigned char * colorize( short_array& map, int W, int H ){
 	unsigned char * r = new unsigned char[ W*H*3 ];
 	for( int k=0; k<W*H; k++ ){
 		int c = colors[ map[k] ];
@@ -62,8 +62,7 @@ unsigned char * colorize( const short * map, int W, int H ){
 }
 
 // Certainty that the groundtruth is correct
-const float GT_PROB = 0.5;
-float a = 0.0, b = 1.0, lambda = 0.9;
+const float GT_PROB = 0.75;
 
 
 // Simple classifier that is 50% certain that the annotation is correct
@@ -112,6 +111,7 @@ class DenseEnergyMinimizer: public EnergyMinimizer
     unsigned char *anno;
     short *map;
     float *unary;
+    float *l_unary;
     float *u_result;
     float *p_result;
     DenseCRF2D* crf;
@@ -125,6 +125,7 @@ class DenseEnergyMinimizer: public EnergyMinimizer
         crf(NULL),
         map(NULL),
         unary(NULL),
+        l_unary(NULL),
         u_result(NULL),
         p_result(NULL),
         im(NULL),
@@ -148,8 +149,9 @@ class DenseEnergyMinimizer: public EnergyMinimizer
             exit(1);
         }
         N = W*H;
-        short * map = new short[N];
-        float * unary = classify( anno, W, H, M , map);
+        map = new short[N];
+        unary = classify( anno, W, H, M , map);
+        l_unary = new float[N*M];
 
         crf = new DenseCRF2D(W,H,M);
         crf->setUnaryEnergy( unary );
@@ -173,14 +175,13 @@ class DenseEnergyMinimizer: public EnergyMinimizer
 
     virtual short_array minimize(short_array input, double lambda, double& energy, double &m, double& b)
     {
+        cout<<"Minimizing Lambda = "<<lambda<<endl;
         short_array output(new short[N]);
-        float* l_unary = new float[N*M];
         for(int i = 0; i < N*M; i++)
             l_unary[i] = (float)lambda*unary[i];
         crf->setUnaryEnergy(l_unary);
         float b_energy = lambda * u_sum + p_sum;
         cout<<"Before optimization: energy is "<<b_energy<<endl;
-        crf->map(3, map);
         crf->unaryEnergy( map, u_result);
         crf->pairwiseEnergy(map, p_result, -1);
         float n_u_sum = 0.0f, n_p_sum = 0.0f;
@@ -188,7 +189,23 @@ class DenseEnergyMinimizer: public EnergyMinimizer
         {
             n_u_sum += u_result[i];
             n_p_sum += p_result[i];
+        }
+        cout<< "Unary sum: "<<n_u_sum <<" = lambda*u = "<<lambda<<"* "<< u_sum<<" = "<<lambda*u_sum<<endl;
+        cout<< "Pairwise sum: "<<n_p_sum <<endl;
+
+        crf->map(3, map);
+        cout<<"AFTER ***"<<endl;
+
+        crf->unaryEnergy( map, u_result);
+        crf->pairwiseEnergy(map, p_result, -1);
+        n_u_sum = 0.0f, n_p_sum = 0.0f;
+        u_sum = 0;
+        for(int i = 0; i < N; ++i)
+        {
+            n_u_sum += u_result[i];
+            n_p_sum += p_result[i];
             output[i] = map[i];
+            u_sum += unary[ i*M+map[i]];
         }
         cout<< "Unary sum: "<<n_u_sum <<" = lambda*u = "<<lambda<<"* "<< u_sum<<" = "<<lambda*u_sum<<endl;
         cout<< "Pairwise sum: "<<n_p_sum <<endl;
@@ -196,7 +213,8 @@ class DenseEnergyMinimizer: public EnergyMinimizer
         m = u_sum;
         b = n_p_sum;
         energy = m * lambda + b;
-        delete[] l_unary;
+        //delete[] l_unary;
+        return output;
     }
     
     int getWidth(){return W;}
@@ -224,6 +242,8 @@ class DenseEnergyMinimizer: public EnergyMinimizer
             delete[] im;
         if(anno)
             delete[] anno;
+        if(l_unary)
+            delete[] l_unary;
 
     }
 
@@ -236,7 +256,7 @@ int main( int argc, char* argv[]){
     const int M = 3;
     DenseEnergyMinimizer *e = new DenseEnergyMinimizer(argv[1],argv[2],M);
 			// Setup the CRF model
-	ApproximateES aes(/* number of vars */ e->getNumberOfVariables(),/*lambda_min */ 0.0,/* lambda_max*/ 0.1, /* energy_minimizer */e,/* x0 */ NULL, /*max_iter */10000,/*verbosity*/ 10);
+	ApproximateES aes(/* number of vars */ e->getNumberOfVariables(),/*lambda_min */ 1.0,/* lambda_max*/ 10.1, /* energy_minimizer */e,/* x0 */ NULL, /*max_iter */10000,/*verbosity*/ 10);
     aes.loop();
     vector<short_array> labelings = aes.getLabelings();
     string out_dir(argv[3]);
@@ -258,7 +278,9 @@ int main( int argc, char* argv[]){
         }*/
         string out("_output.ppm");
         string s = out_dir + SSTR( i ) + out;
-        unsigned char *res = colorize( labelings[i].get(), e->getWidth(), e->getHeight());
+        cout<<"writing: "<<s<<endl;
+        unsigned char *res = colorize( labelings[i], e->getWidth(), e->getHeight());
+        cout<<"\tpp"<<endl;
         writePPM( s.c_str(), e->getWidth(), e->getHeight(), res);
         delete[] res;
         //imwrite(s.c_str(), m);
