@@ -16,7 +16,7 @@ add_subdirectory(libgco)
 include_directories(libgco)
 add_subdirectory(fgbg-data)
 add_subdirectory(fgbg-spatialy-varying-smooth)
-#add_subdirectory(dense)
+add_subdirectory(dense)
 add_executable(approximateES example-gco.cpp)
 add_executable(fgbg-gco fgbg-gco.cpp)
 
