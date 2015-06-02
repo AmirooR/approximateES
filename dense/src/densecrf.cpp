@@ -111,6 +111,7 @@ public:
 /////////////////////////////
 DenseCRF::DenseCRF(int N, int M) : N_(N), M_(M) {
 	unary_ = allocate( N_*M_ );
+    init_x = allocate( N_*M_ );
 	additional_unary_ = allocate( N_*M_ );
 	current_ = allocate( N_*M_ );
 	next_ = allocate( N_*M_ );
@@ -124,6 +125,7 @@ DenseCRF::~DenseCRF() {
 	deallocate( current_ );
 	deallocate( next_ );
 	deallocate( tmp_ );
+    deallocate( init_x);
 	for( unsigned int i=0; i<pairwise_.size(); i++ )
 		delete pairwise_[i];
 }
@@ -172,6 +174,11 @@ void DenseCRF2D::addPairwiseBilateral ( float sx, float sy, float sr, float sg, 
 void DenseCRF::setUnaryEnergy ( const float* unary ) {
 	memcpy( unary_, unary, N_*M_*sizeof(float) );
 }
+
+void DenseCRF::setInitX( const float* initX){
+    memcpy( init_x, initX, N_*M_*sizeof(float) );
+}
+
 void DenseCRF::setUnaryEnergy ( int n, const float* unary ) {
 	memcpy( unary_+n*M_, unary, M_*sizeof(float) );
 }
@@ -273,7 +280,7 @@ void DenseCRF::pairwiseEnergy(const short* ass, float* result, int term) {
 }
 void DenseCRF::startInference(){
 	// Initialize using the unary energies
-	expAndNormalize( current_, unary_, -1 );
+	expAndNormalize( current_, init_x, -1 );
 }
 void DenseCRF::stepInference( float relax ){
 #ifdef SSE_DENSE_CRF

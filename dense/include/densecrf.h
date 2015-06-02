@@ -50,6 +50,7 @@ protected:
 	// Number of variables and labels
 	int N_, M_;
 	float *unary_, *additional_unary_, *current_, *next_, *tmp_;
+    float *init_x;
 	
 	// Store all pairwise potentials
 	std::vector<PairwisePotential*> pairwise_;
@@ -77,6 +78,7 @@ public:
 	
 	// Set the unary potential for all variables and labels (memory order is [x0l0 x0l1 x0l2 .. x1l0 x1l1 ...])
 	void setUnaryEnergy( const float * unary );
+    void setInitX(const float * init_x);
 	
 	// Set the unary potential for a specific variable
 	void setUnaryEnergy( int n, const float * unary );
