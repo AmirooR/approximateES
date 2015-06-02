@@ -52,7 +52,7 @@ void putColor( unsigned char * c, unsigned int cc ){
 	c[0] = cc&0xff; c[1] = (cc>>8)&0xff; c[2] = (cc>>16)&0xff;
 }
 // Produce a color image from a bunch of labels
-unsigned char * colorize( short_array& map, int W, int H ){
+unsigned char * colorize( short* map, int W, int H ){
 	unsigned char * r = new unsigned char[ W*H*3 ];
 	for( int k=0; k<W*H; k++ ){
 		int c = colors[ map[k] ];
@@ -115,10 +115,17 @@ class DenseEnergyMinimizer: public EnergyMinimizer
     float *u_result;
     float *p_result;
     DenseCRF2D* crf;
-    float u_sum;
-    float p_sum;
+    double u_sum;
+    double p_sum;
+    bool approximate_pairwise;
+    double gsx,gsy,gw;
+    double bsx,bsy,bsr,bsg,bsb,bw;
+
   public:
-    DenseEnergyMinimizer(const char *im_path, const char *anno_path, int M):
+    DenseEnergyMinimizer(const char *im_path, const char *anno_path, int M, bool approximate_pairwise=false,
+            double gsx = 3.f, double gsy = 3.f, double gw=3.f,
+            double bsx = 60.f, double bsy = 60.f, double bsr=20.f, double bsg=20.f, double bsb=20.f, double bw=10.f
+            ):
         M(M),
         u_sum(0),
         p_sum(0),
@@ -129,7 +136,10 @@ class DenseEnergyMinimizer: public EnergyMinimizer
         u_result(NULL),
         p_result(NULL),
         im(NULL),
-        anno(NULL)
+        anno(NULL),
+        approximate_pairwise(approximate_pairwise),
+        gsx(gsx), gsy(gsy), gw(gw),
+        bsx(bsx), bsy(bsy), bsr(bsr), bsg(bsg), bsb(bsb), bw(bw)
     {
         int GH, GW;
         im = readPPM( im_path, W, H );
@@ -155,8 +165,8 @@ class DenseEnergyMinimizer: public EnergyMinimizer
 
         crf = new DenseCRF2D(W,H,M);
         crf->setUnaryEnergy( unary );
-        crf->addPairwiseGaussian( 3, 3, 3 );
-        crf->addPairwiseBilateral( 60, 60, 20, 20, 20, im, 10 );
+        crf->addPairwiseGaussian( gsx, gsy, gw );
+        crf->addPairwiseBilateral( bsx, bsy, bsr, bsg, bsb, im, bw );
         u_result = new float[N];
         p_result = new float[N];
 
@@ -178,42 +188,67 @@ class DenseEnergyMinimizer: public EnergyMinimizer
         cout<<"Minimizing Lambda = "<<lambda<<endl;
         short_array output(new short[N]);
         for(int i = 0; i < N*M; i++)
-            l_unary[i] = (float)lambda*unary[i];
+            l_unary[i] = lambda*unary[i];
         crf->setUnaryEnergy(l_unary);
-        float b_energy = lambda * u_sum + p_sum;
-        cout<<"Before optimization: energy is "<<b_energy<<endl;
-        crf->unaryEnergy( map, u_result);
-        crf->pairwiseEnergy(map, p_result, -1);
-        float n_u_sum = 0.0f, n_p_sum = 0.0f;
-        for(int i = 0; i < N; ++i)
+        if(approximate_pairwise)
         {
-            n_u_sum += u_result[i];
-            n_p_sum += p_result[i];
+            double b_energy = lambda * u_sum + p_sum;
+            cout<<"Before optimization: approximate energy is "<<b_energy<<endl;
+            crf->unaryEnergy( map, u_result);
+            crf->pairwiseEnergy(map, p_result, -1);
+            float n_u_sum = 0.0f, n_p_sum = 0.0f;
+            for(int i = 0; i < N; ++i)
+            {
+                n_u_sum += u_result[i];
+                n_p_sum += p_result[i];
+            }
+            cout<< "Unary sum: "<<n_u_sum <<" = lambda*u = "<<lambda<<"* "<< u_sum<<" = "<<lambda*u_sum<<endl;
+            cout<< "Pairwise sum: "<<n_p_sum <<endl;
+
+            crf->map(3, map);
+            cout<<"AFTER ***"<<endl;
+
+            crf->unaryEnergy( map, u_result);
+            crf->pairwiseEnergy(map, p_result, -1);
+            n_u_sum = 0.0f, n_p_sum = 0.0f;
+            u_sum = 0;
+            for(int i = 0; i < N; ++i)
+            {
+                n_u_sum += u_result[i];
+                n_p_sum += p_result[i];
+                output[i] = map[i];
+                u_sum += unary[ i*M+map[i]];
+            }
+            cout<< "Unary sum: "<<n_u_sum <<" = lambda*u = "<<lambda<<"* "<< u_sum<<" = "<<lambda*u_sum<<endl;
+            cout<< "Pairwise sum: "<<n_p_sum <<endl;
+            cout<< "After optimization: energy is "<< (n_p_sum + n_u_sum) << endl;
+            m = u_sum;
+            b = n_p_sum;
+            energy = m * lambda + b;
         }
-        cout<< "Unary sum: "<<n_u_sum <<" = lambda*u = "<<lambda<<"* "<< u_sum<<" = "<<lambda*u_sum<<endl;
-        cout<< "Pairwise sum: "<<n_p_sum <<endl;
-
-        crf->map(3, map);
-        cout<<"AFTER ***"<<endl;
-
-        crf->unaryEnergy( map, u_result);
-        crf->pairwiseEnergy(map, p_result, -1);
-        n_u_sum = 0.0f, n_p_sum = 0.0f;
-        u_sum = 0;
-        for(int i = 0; i < N; ++i)
+        else//computing exact pairwise
         {
-            n_u_sum += u_result[i];
-            n_p_sum += p_result[i];
-            output[i] = map[i];
-            u_sum += unary[ i*M+map[i]];
+            crf->map(3, map);
+            cout<<"AFTER ***"<<endl;
+            crf->unaryEnergy( map, u_result);
+            //crf->pairwiseEnergy(map, p_result, -1);
+            double n_p_sum = compute_pairwise_energy();
+            double n_u_sum = 0.0;
+            u_sum = 0;
+            for(int i = 0; i < N; ++i)
+            {
+                n_u_sum += u_result[i];
+                //n_p_sum += p_result[i];
+                output[i] = map[i];
+                u_sum += unary[ i*M+map[i]];
+            }
+            cout<< "Unary sum: "<<n_u_sum <<" = lambda*u = "<<lambda<<"* "<< u_sum<<" = "<<lambda*u_sum<<endl;
+            cout<< "Pairwise sum: "<<n_p_sum <<endl;
+            cout<< "After optimization: energy is "<< (n_p_sum + n_u_sum) << endl;
+            m = u_sum;
+            b = n_p_sum;
+            energy = m * lambda + b;
         }
-        cout<< "Unary sum: "<<n_u_sum <<" = lambda*u = "<<lambda<<"* "<< u_sum<<" = "<<lambda*u_sum<<endl;
-        cout<< "Pairwise sum: "<<n_p_sum <<endl;
-        cout<< "After optimization: energy is "<< (n_p_sum + n_u_sum) << endl;
-        m = u_sum;
-        b = n_p_sum;
-        energy = m * lambda + b;
-        //delete[] l_unary;
         return output;
     }
     
@@ -225,6 +260,36 @@ class DenseEnergyMinimizer: public EnergyMinimizer
         return (size_t)N;
     }
 
+    float compute_pairwise_energy()
+    {
+        float sum_e = 0.0f;
+        for(int k=0; k < N; k++)
+        {
+#pragma omp parallel for reduction(-:sum_e)                    
+            for(int  k2=0; k2 < k;  k2++)
+            {
+                float d_e = 0;
+                if( map[k] == map[k2] )
+                {
+                    /*int j = k/W;
+                    int i = k%W;
+                    int j2 = k2/W;
+                    int i2 = k2%W;*/
+                    int dx = (k%W) - (k2%W);//i - i2;
+                    int dy = (k/W) - (k2/W);//j - j2;
+                    int dr = im[k*3+0]-im[k2*3+0];
+                    int dg = im[k*3+1]-im[k2*3+1];
+                    int db = im[k*3+2]-im[k2*3+2];
+                    d_e = bw*exp(-0.5 * ( (dx*dx)/(bsx*bsx) + (dy*dy)/(bsy*bsy) + 
+                                (dr*dr)/(bsr*bsr) + (dg*dg)/(bsg*bsg) + (db*db)/(bsb*bsb) ) );
+                    d_e += gw*exp(-0.5 * ( (dx*dx)/(gsx*gsx) + (dy*dy)/(gsy*gsy) ) );
+                }
+                sum_e -= d_e;
+            }
+        }
+        return sum_e;
+    }
+    
     virtual ~DenseEnergyMinimizer()
     {
         if(crf)
@@ -254,9 +319,9 @@ int main( int argc, char* argv[]){
 		return 1;
 	}
     const int M = 3;
-    DenseEnergyMinimizer *e = new DenseEnergyMinimizer(argv[1],argv[2],M);
+    DenseEnergyMinimizer *e = new DenseEnergyMinimizer(argv[1],argv[2],M,true);
 			// Setup the CRF model
-	ApproximateES aes(/* number of vars */ e->getNumberOfVariables(),/*lambda_min */ 1.0,/* lambda_max*/ 10.1, /* energy_minimizer */e,/* x0 */ NULL, /*max_iter */10000,/*verbosity*/ 10);
+	ApproximateES aes(/* number of vars */ e->getNumberOfVariables(),/*lambda_min */ 1.0,/* lambda_max*/ 10.0, /* energy_minimizer */e,/* x0 */ NULL, /*max_iter */10000,/*verbosity*/ 10);
     aes.loop();
     vector<short_array> labelings = aes.getLabelings();
     string out_dir(argv[3]);
@@ -278,9 +343,7 @@ int main( int argc, char* argv[]){
         }*/
         string out("_output.ppm");
         string s = out_dir + SSTR( i ) + out;
-        cout<<"writing: "<<s<<endl;
-        unsigned char *res = colorize( labelings[i], e->getWidth(), e->getHeight());
-        cout<<"\tpp"<<endl;
+        unsigned char *res = colorize( labelings[i].get(), e->getWidth(), e->getHeight());
         writePPM( s.c_str(), e->getWidth(), e->getHeight(), res);
         delete[] res;
         //imwrite(s.c_str(), m);
