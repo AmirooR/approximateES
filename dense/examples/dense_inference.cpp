@@ -390,6 +390,7 @@ class DenseEnergyMinimizer: public EnergyMinimizer
                 }
             }
         }
+        sum_e = sum_e + prev_p_e;
         prev_p_e = sum_e;
         return sum_e;
     }
