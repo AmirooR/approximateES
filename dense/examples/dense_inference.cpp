@@ -113,6 +113,7 @@ class DenseEnergyMinimizer: public EnergyMinimizer
     unsigned char *im;
     unsigned char *anno;
     short *map;
+    short *prev_map;
     float *unary;
     float *l_unary;
     float *u_result;
@@ -123,17 +124,21 @@ class DenseEnergyMinimizer: public EnergyMinimizer
     double p_sum;
     bool approximate_pairwise;
     bool do_initialization;
+    bool use_prev_computation;
     int do_normalization;
     double gsx,gsy,gw;
     double bsx,bsy,bsr,bsg,bsb,bw;
     double *norms;
     double mean_norm;
+    int num_computations;
+    double prev_p_e;
 
   public:
     DenseEnergyMinimizer(const char *im_path, const char *anno_path, int M, 
             int do_normalization = 0,
             bool do_initialization = true,
             bool approximate_pairwise=false,
+            bool use_prev_computation=true,
             double gsx = 3.f, double gsy = 3.f, double gw=3.f,
             double bsx = 60.f, double bsy = 60.f, double bsr=20.f, double bsg=20.f, double bsb=20.f, double bw=10.f
             ):
@@ -142,6 +147,7 @@ class DenseEnergyMinimizer: public EnergyMinimizer
         p_sum(0),
         crf(NULL),
         map(NULL),
+        prev_map(NULL),
         unary(NULL),
         l_unary(NULL),
         u_result(NULL),
@@ -153,8 +159,10 @@ class DenseEnergyMinimizer: public EnergyMinimizer
         approximate_pairwise(approximate_pairwise),
         do_initialization(do_initialization),
         do_normalization(do_normalization),
+        use_prev_computation(use_prev_computation),
         gsx(gsx), gsy(gsy), gw(gw),
-        bsx(bsx), bsy(bsy), bsr(bsr), bsg(bsg), bsb(bsb), bw(bw)
+        bsx(bsx), bsy(bsy), bsr(bsr), bsg(bsg), bsb(bsb), bw(bw),
+        num_computations(0)
     {
         int GH, GW;
         im = readPPM( im_path, W, H );
@@ -175,6 +183,7 @@ class DenseEnergyMinimizer: public EnergyMinimizer
         }
         N = W*H;
         map = new short[N];
+        prev_map = new short[N];
         unary = classify( anno, W, H, M , map);
         init_x = new float[N*M];
         memcpy( init_x, unary, N*M*sizeof(float) );
@@ -272,6 +281,8 @@ class DenseEnergyMinimizer: public EnergyMinimizer
         }
         else//computing exact pairwise
         {
+            if(use_prev_computation)
+                memcpy(prev_map, map, N*sizeof(short));
             crf->map(3, map);
             cout<<"AFTER ***"<<endl;
             crf->unaryEnergy( map, u_result);
@@ -329,9 +340,65 @@ class DenseEnergyMinimizer: public EnergyMinimizer
         }
         mean_norm = mean_norm/N;
     }
+ 
+    inline double compute_k_i_j(int k, int k2)
+    {
+        /*int j = k/W;
+          int i = k%W;
+          int j2 = k2/W;
+          int i2 = k2%W;*/
 
+        double d_e = 0.0;
+        int dx = (k%W) - (k2%W);//i - i2;
+        int dy = (k/W) - (k2/W);//j - j2;
+        int dr = im[k*3+0]-im[k2*3+0];
+        int dg = im[k*3+1]-im[k2*3+1];
+        int db = im[k*3+2]-im[k2*3+2];
+        d_e = bw*exp(-0.5 * ( (dx*dx)/(bsx*bsx) + (dy*dy)/(bsy*bsy) + 
+                    (dr*dr)/(bsr*bsr) + (dg*dg)/(bsg*bsg) + (db*db)/(bsb*bsb) ) );
+        d_e += gw*exp(-0.5 * ( (dx*dx)/(gsx*gsx) + (dy*dy)/(gsy*gsy) ) );
+        if(do_normalization>0)
+        {
+            if(do_normalization == PIXEL_NORMALIZATION)
+                d_e /= norms[k];
+            else if(do_normalization == MEAN_NORMALIZATION)
+                d_e /= mean_norm;
+        }
+        return d_e;
+    }
+
+    double compute_pairwise_using_prev()
+    {
+        double sum_e = 0.0; // prev_p_e;
+        for(int k=0; k < N; k++)
+        {
+            if( map[k] != prev_map[k] )
+            {
+#pragma omp parallel for reduction(-:sum_e)                    
+                for(int k2=0; k2 < N; k2++)
+                {
+                    double d_e = 0.0;
+                    if( prev_map[k] == prev_map[k2] && map[k] != map[k2] && k!=k2)
+                    {
+                        d_e -= compute_k_i_j(k,k2);
+                    }
+                    else if(map[k] == map[k2] && prev_map[k] != prev_map[k2] && k!=k2)
+                    {
+                        d_e += compute_k_i_j(k,k2);
+                    }
+                    sum_e -= d_e;
+                }
+            }
+        }
+        prev_p_e = sum_e;
+        return sum_e;
+    }
+
+    
     double compute_pairwise_energy()
     {
+        if(num_computations > 0 && use_prev_computation)
+            return compute_pairwise_using_prev();
         double sum_e = 0.0f;
         for(int k=0; k < N; k++)
         {
@@ -341,29 +408,13 @@ class DenseEnergyMinimizer: public EnergyMinimizer
                 double d_e = 0;
                 if( map[k] == map[k2] )
                 {
-                    /*int j = k/W;
-                    int i = k%W;
-                    int j2 = k2/W;
-                    int i2 = k2%W;*/
-                    int dx = (k%W) - (k2%W);//i - i2;
-                    int dy = (k/W) - (k2/W);//j - j2;
-                    int dr = im[k*3+0]-im[k2*3+0];
-                    int dg = im[k*3+1]-im[k2*3+1];
-                    int db = im[k*3+2]-im[k2*3+2];
-                    d_e = bw*exp(-0.5 * ( (dx*dx)/(bsx*bsx) + (dy*dy)/(bsy*bsy) + 
-                                (dr*dr)/(bsr*bsr) + (dg*dg)/(bsg*bsg) + (db*db)/(bsb*bsb) ) );
-                    d_e += gw*exp(-0.5 * ( (dx*dx)/(gsx*gsx) + (dy*dy)/(gsy*gsy) ) );
-                    if(do_normalization>0)
-                    {
-                        if(do_normalization == PIXEL_NORMALIZATION)
-                            d_e /= norms[k];
-                        else if(do_normalization == MEAN_NORMALIZATION)
-                            d_e /= mean_norm;
-                    }
+                    d_e = compute_k_i_j(k,k2); 
                 }
                 sum_e -= d_e;
             }
         }
+        num_computations++;
+        prev_p_e = sum_e;
         return sum_e;
     }
     
@@ -373,6 +424,8 @@ class DenseEnergyMinimizer: public EnergyMinimizer
             delete crf;
         if(map)
             delete[] map;
+        if(prev_map)
+            delete[] prev_map;
         if(unary)
             delete[] unary;
         if(u_result)
@@ -402,7 +455,8 @@ int main( int argc, char* argv[]){
     DenseEnergyMinimizer *e = new DenseEnergyMinimizer(argv[1],argv[2],/*number of labels*/M,
             /* do normalization */ PIXEL_NORMALIZATION,//MEAN_NORMALIZATION ,//PIXEL_NORMALIZATION, NO_NORMALIZATION,
             /* do initialization */ true, 
-            /* approximate pairwise */false);
+            /* approximate pairwise */false,
+            /* use_prev_computation */true);
     
 	ApproximateES aes(/* number of vars */ e->getNumberOfVariables(),/*lambda_min */ 0.0,/* lambda_max*/ 100.0, /* energy_minimizer */e,/* x0 */ e->get_map(), /*max_iter */10000,/*verbosity*/ 10);
     aes.loop();
