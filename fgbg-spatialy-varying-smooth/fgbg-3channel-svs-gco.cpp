@@ -30,10 +30,10 @@ double smoothFn(int p1, int p2, int l1, int l2, void* data)
     int r2 = p2/myData->width;
     int c1 = p1%myData->width;
     int c2 = p2%myData->width;
-
-    double color_diff = fabs(myData->img.at<double>(r1,c1) - myData->img.at<double>(r2,c2));
+    Vec3d color_diff3 = myData->img.at<Vec3d>(r1,c1) - myData->img.at<Vec3d>(r2,c2);
+    double color_diff = pow(fabs(color_diff3[0]),2) + pow(fabs(color_diff3[1]),2) + pow(fabs(color_diff3[2]),2);
     
-    return (myData->lambda1 + myData->lambda2*exp(-myData->beta*color_diff*color_diff*3.0));
+    return (myData->lambda1 + myData->lambda2*exp(-myData->beta*color_diff));
 }
 
 class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
@@ -61,12 +61,14 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
         Mat hm1 = img1F;
         Mat hm2;
         pow( hm1.rowRange(1,height) - hm1.rowRange(0,height-1), 2, hm2);
-        count += hm2.rows * hm2.cols;
-        beta += sum(hm2)[0];
+        count += hm2.rows * hm2.cols*3;
+        Scalar ss = sum(hm2);
+        beta += ss[0]+ss[1]+ss[2];
 
         pow( hm1.colRange(1,width) - hm1.colRange(0,width-1), 2, hm2);
-        count += hm2.rows * hm2.cols;
-        beta += sum(hm2)[0];
+        count += hm2.rows * hm2.cols*3;
+        ss = sum(hm2);
+        beta += ss[0]+ss[1]+ss[2];
         double beta_inv = 2.0*(beta/count);
         if(beta_inv == 0)
         {
@@ -89,8 +91,8 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
         gc(NULL),
         unaries(NULL)
     {
-        img1 = imread(input_img1, 0);
-        img1.convertTo( img1F, CV_64FC1);
+        img1 = imread(input_img1);
+        img1.convertTo( img1F, CV_64FC3);
         img1F = img1F / 255.0;
         width = img1.cols;
         height = img1.rows;
@@ -115,12 +117,17 @@ class FgBgSVSGCEnergyMinimizer: public EnergyMinimizer
             {
                 for(int l = 0; l < num_labels; l++)
                 {
-                    double cost = fabs(img1F.at<double>(y,x)-fg);
+                    double cost = fabs(img1F.at<Vec3d>(y,x)[0]-fg);
+                    cost += fabs(img1F.at<Vec3d>(y,x)[1]-fg);
+                    cost += fabs(img1F.at<Vec3d>(y,x)[2]-fg);
                     if( l == 1 )
                     {
-                        cost = fabs(img1F.at<double>(y,x)-bg);
+                        cost = fabs(img1F.at<Vec3d>(y,x)[0]-bg);
+                        cost += fabs(img1F.at<Vec3d>(y,x)[1]-bg);
+                        cost += fabs(img1F.at<Vec3d>(y,x)[2]-bg);
+
                     }
-                    unaries[ (y*width+x)*num_labels + l] = cost;
+                    unaries[ (y*width+x)*num_labels + l] = cost/3.0;
                 }
             }
         }
@@ -225,7 +232,7 @@ int main(int argc, char* argv[])
         cout<<"Usage: "<<argv[0]<<" image output_dir"<<endl;
         return 1;
     }
-    FgBgSVSGCEnergyMinimizer* e = new FgBgSVSGCEnergyMinimizer(argv[1], /*fg*/1.0, /*bg*/0.0, /*lambda1*/0.0, /*lambda2*/10.0, /*c*/0.0,/*d*/1.0 );
+    FgBgSVSGCEnergyMinimizer* e = new FgBgSVSGCEnergyMinimizer(argv[1], /*fg*/1.0, /*bg*/0.0, /*lambda1*/0.1, /*lambda2*/1.0, /*c*/0.0,/*d*/1.0 );
     
     ApproximateES aes(/* number of vars */ e->getNumberOfVariables(),/*lambda_min */ -1000.0,/* lambda_max*/ 1000.0, /* energy_minimizer */e,/* x0 */ NULL, /*max_iter */10000,/*verbosity*/ 10);
    

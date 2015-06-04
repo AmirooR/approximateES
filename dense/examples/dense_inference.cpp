@@ -400,7 +400,7 @@ int main( int argc, char* argv[]){
 	}
     const int M = 3;
     DenseEnergyMinimizer *e = new DenseEnergyMinimizer(argv[1],argv[2],/*number of labels*/M,
-            /* do normalization */ MEAN_NORMALIZATION ,//PIXEL_NORMALIZATION, NO_NORMALIZATION,
+            /* do normalization */ PIXEL_NORMALIZATION,//MEAN_NORMALIZATION ,//PIXEL_NORMALIZATION, NO_NORMALIZATION,
             /* do initialization */ true, 
             /* approximate pairwise */false);
     
