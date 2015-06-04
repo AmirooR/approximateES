@@ -4,6 +4,7 @@
 #include <queue>
 #include "EnergyMinimizer.hpp"
 #include <stdio.h>
+#include "util.hpp"
 
 typedef struct Undefined
 {

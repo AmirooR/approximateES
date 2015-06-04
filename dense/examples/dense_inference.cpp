@@ -288,6 +288,12 @@ class DenseEnergyMinimizer: public EnergyMinimizer
             crf->unaryEnergy( map, u_result);
             //crf->pairwiseEnergy(map, p_result, -1);
             double n_p_sum = compute_pairwise_energy();
+            /*  for test 
+            use_prev_computation = false;
+            double my_np_sum = compute_pairwise_energy();
+            cout<<KBBLU<< "pairwise: "<<my_np_sum<<", using prev: "<<n_p_sum<<RESET<<endl;
+            end of for test*/
+
             double n_u_sum = 0.0;
             u_sum = 0;
             for(int i = 0; i < N; ++i)
@@ -447,6 +453,8 @@ class DenseEnergyMinimizer: public EnergyMinimizer
     }
 
 };
+
+
 int main( int argc, char* argv[]){
 	if (argc<4){
 		printf("Usage: %s image annotations outputdir\n", argv[0] );
