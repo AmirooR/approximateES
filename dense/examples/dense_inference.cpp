@@ -162,7 +162,8 @@ class DenseEnergyMinimizer: public EnergyMinimizer
         use_prev_computation(use_prev_computation),
         gsx(gsx), gsy(gsy), gw(gw),
         bsx(bsx), bsy(bsy), bsr(bsr), bsg(bsg), bsb(bsb), bw(bw),
-        num_computations(0)
+        num_computations(0),
+        prev_p_e(0)
     {
         int GH, GW;
         im = readPPM( im_path, W, H );
@@ -281,19 +282,28 @@ class DenseEnergyMinimizer: public EnergyMinimizer
         }
         else//computing exact pairwise
         {
-            if(use_prev_computation)
-                memcpy(prev_map, map, N*sizeof(short));
             crf->map(3, map);
             cout<<"AFTER ***"<<endl;
             crf->unaryEnergy( map, u_result);
-            //crf->pairwiseEnergy(map, p_result, -1);
-            double n_p_sum = compute_pairwise_energy();
-            /*  for test 
-            use_prev_computation = false;
-            double my_np_sum = compute_pairwise_energy();
-            cout<<KBBLU<< "pairwise: "<<my_np_sum<<", using prev: "<<n_p_sum<<RESET<<endl;
-            end of for test*/
+            /* for test 
+            if(num_computations>0)
+                test_computations();
+            end for test */
+            double n_p_sum = compute_pairwise_energy(prev_p_e);
+            if(use_prev_computation)
+            {
+                /*  for test 
+                use_prev_computation = false;
+                double my_np_sum = compute_pairwise_energy(prev_p_e);
+                cout<<KBBLU<< "pairwise: "<<my_np_sum<<", using prev: "<<n_p_sum<<RESET<<endl;
+                use_prev_computation = true;
+                end of for test*/
 
+                memcpy(prev_map, map, N*sizeof(short));
+                prev_p_e = n_p_sum;
+                
+            }
+            
             double n_u_sum = 0.0;
             u_sum = 0;
             for(int i = 0; i < N; ++i)
@@ -344,7 +354,7 @@ class DenseEnergyMinimizer: public EnergyMinimizer
             norms[k] = this_sum;
             mean_norm += this_sum;
         }
-        mean_norm = mean_norm/N;
+        mean_norm = mean_norm/(N*N);
     }
  
     inline double compute_k_i_j(int k, int k2)
@@ -373,39 +383,195 @@ class DenseEnergyMinimizer: public EnergyMinimizer
         return d_e;
     }
 
-    double compute_pairwise_using_prev()
+    double compute_pairwise_using_prev(double prev_pe)
     {
-        double sum_e = 0.0; // prev_p_e;
+        double sum_e = prev_pe;
         for(int k=0; k < N; k++)
         {
             if( map[k] != prev_map[k] )
             {
-#pragma omp parallel for reduction(-:sum_e)                    
+#pragma omp parallel for reduction(+:sum_e)                    
                 for(int k2=0; k2 < N; k2++)
                 {
                     double d_e = 0.0;
                     if( prev_map[k] == prev_map[k2] && map[k] != map[k2] && k!=k2)
                     {
-                        d_e -= compute_k_i_j(k,k2);
+                        if(! (prev_map[k2] != map[k2] && k > k2))
+                            d_e += compute_k_i_j(k,k2);
                     }
                     else if(map[k] == map[k2] && prev_map[k] != prev_map[k2] && k!=k2)
                     {
-                        d_e += compute_k_i_j(k,k2);
+                        if(! (prev_map[k2] != map[k2] && k > k2))
+                            d_e -= compute_k_i_j(k,k2);
                     }
-                    sum_e -= d_e;
+                    sum_e += d_e;
                 }
             }
         }
-        sum_e = sum_e + prev_p_e;
-        prev_p_e = sum_e;
+        //sum_e;
         return sum_e;
     }
 
-    
-    double compute_pairwise_energy()
+    void test_computations()
+    {
+        check_symmetry();
+        //exact
+        cout<<KBYEL<<" ** TESTING ** "<<RESET<<endl;
+        cout<<endl;
+        cout<<endl;
+        double prev_exact, new_exact;
+        int prev_exact_num, new_exact_num;
+        compute_pairwise_exact( prev_map, prev_exact_num, prev_exact);
+        compute_pairwise_exact( map, new_exact_num, new_exact);
+        printf("%sprev_exact: %f # %d\n",KRED,prev_exact, prev_exact_num);
+        printf("%snew_exact:  %f # %d\n",KRED,new_exact, new_exact_num);
+
+        double similar_e;int similar_num;
+        similar(prev_map, map, similar_num, similar_e);
+        printf("%ssimilar:    %f # %d\n",KRED,similar_e, similar_num);
+
+        double subtract_e;int subtract_num;
+        subtract(prev_map, map, subtract_num , subtract_e);
+        printf("%ssubtract:   %f # %d\n",KRED,subtract_e, subtract_num);
+
+        double add_e;int add_num;
+        add(prev_map, map, add_num, add_e);
+        printf("%sadd:        %f # %d\n\n",KRED, add_e, add_num);
+        printf("sim+sub(%f) == prev(%f)\n", similar_e+subtract_e, prev_exact);
+        printf("sim+add(%f) == new (%f)\n\n", similar_e+add_e, new_exact);
+
+        printf("#sim+#sub(%d) == #prev(%d)\n", similar_num+subtract_num, prev_exact_num);
+        printf("#sim+#add(%d) == #new (%d)\n\n", similar_num+add_num, new_exact_num);
+
+        double t_current_sum, t_add_sum, t_sub_sum;
+        int t_current_num, t_add_num, t_sub_num;
+        cout<<KBGRN<<"PREV_P_E: "<< -prev_p_e<<RESET<<endl;
+        using_prev(prev_map, map, prev_exact, t_add_sum, t_add_num, t_sub_sum, t_sub_num, t_current_sum, t_current_num);
+
+        printf("%snew_fast_e(%f) == new(%f)\n",KCYN, t_current_sum, new_exact);
+        printf("%sfast_add(%f)   == add_e(%f)\n",KCYN, t_add_sum, add_e);
+        printf("%sfast_sub(%f)   == sub_e(%f)\n\n",KCYN, t_sub_sum, subtract_e);
+
+        printf("%s#new_fast_e(%d) != #new(%d)\n",KMAG, t_current_num, new_exact_num);
+        printf("%s#fast_add(%d)   == #add_e(%d)\n",KMAG, t_add_num, add_num);
+        printf("%s#fast_sub(%d)   == #sub_e(%d)\n",KMAG, t_sub_num, subtract_num);
+
+        cout<<RESET<<endl;
+        cout<<endl;
+        cout<<endl;
+    }
+
+    void check_symmetry()
+    {
+        for(int i=0; i < N; i++)
+            for(int j=0; j<i; j++)
+            {
+                double d1 = compute_k_i_j(i,j);
+                double d2 = compute_k_i_j(j,i);
+                if( d1 != d2 )
+                    cout<<KBGRN<<"ERROR IN SYMMETRY ("<<i<<", "<<j<<")"<<RESET<<endl;
+            }
+
+    }
+
+    void compute_pairwise_exact(short* t_map, int& num,double& sum)
+    {
+        sum = 0;
+        num = 0;
+        for(int i=0; i < N; i++)
+            for(int j=0; j<i; j++)
+                if( t_map[i] == t_map[j] )
+                {
+                    sum += compute_k_i_j(i,j);
+                    num++;
+                }
+    }
+
+    void similar(short* t_prev_map, short* t_new_map, int& num, double& sum)
+    {
+        sum = 0;
+        num = 0;
+        for(int i=0; i < N; i++)
+            for(int j=0; j<i; j++)
+                if( t_prev_map[i] == t_prev_map[j]  && t_new_map[i] == t_new_map[j] )
+                {
+                    sum += compute_k_i_j(i,j);
+                    num++;
+                }
+
+    }
+
+    void subtract(short* t_prev_map, short* t_new_map, int& num, double& sum)
+    {
+        sum = 0;
+        num = 0;
+        for(int i=0; i < N; i++)
+            for(int j=0; j<i; j++)
+                if( t_prev_map[i] == t_prev_map[j]  && t_new_map[i] != t_new_map[j] )
+                {
+                    sum += compute_k_i_j(i,j);
+                    num++;
+                }
+    }
+
+     
+    void add(short* t_prev_map, short* t_new_map, int& num, double& sum)
+    {
+        sum = 0;
+        num = 0;
+        for(int i=0; i < N; i++)
+            for(int j=0; j<i; j++)
+                if( t_prev_map[i] != t_prev_map[j]  && t_new_map[i] == t_new_map[j] )
+                {
+                    sum += compute_k_i_j(i,j);
+                    num++;
+                }
+    }
+
+    void using_prev(short* t_prev_map, short* t_new_map, double prev_pe, 
+            double& add_sum, int& add_num,
+            double& sub_sum, int& sub_num,
+            double& cur_sum, int& cur_num)
+    {
+        add_sum = sub_sum = 0;
+        cur_num = sub_num = add_num = 0;
+        cur_sum = prev_pe;
+        for(int i=0; i < N; i++)
+            if( t_prev_map[i] != t_new_map[i] )
+                for(int j=0; j<N; j++)
+                {
+                    
+                    if(t_prev_map[i] != t_prev_map[j] && t_new_map[i] == t_new_map[j] && i!=j)
+                    {
+                        if(! (t_prev_map[j] != t_new_map[j] && i > j) )
+                        {
+                            double curr = compute_k_i_j(i,j);
+                            add_sum += curr;
+                            cur_sum += curr;
+                            add_num++;
+                            cur_num++;
+                        }
+                    }
+                    else if(t_prev_map[i] == t_prev_map[j] && t_new_map[i] != t_new_map[j] && i!=j)
+                    {
+                        if(! (t_prev_map[j] != t_new_map[j] && i > j) )
+                        {
+                            double curr = compute_k_i_j(i,j);
+                            sub_sum += curr;
+                            cur_sum -= curr;
+                            sub_num++;
+                            cur_num++;
+                        }
+                    }
+                }
+    }
+
+   
+
+    double compute_pairwise_energy(double prev_pe)
     {
         if(num_computations > 0 && use_prev_computation)
-            return compute_pairwise_using_prev();
+            return compute_pairwise_using_prev(prev_pe);
         double sum_e = 0.0f;
         for(int k=0; k < N; k++)
         {
@@ -421,7 +587,7 @@ class DenseEnergyMinimizer: public EnergyMinimizer
             }
         }
         num_computations++;
-        prev_p_e = sum_e;
+        //prev_p_e = sum_e;
         return sum_e;
     }
     
@@ -462,7 +628,7 @@ int main( int argc, char* argv[]){
 	}
     const int M = 3;
     DenseEnergyMinimizer *e = new DenseEnergyMinimizer(argv[1],argv[2],/*number of labels*/M,
-            /* do normalization */ PIXEL_NORMALIZATION,//MEAN_NORMALIZATION ,//PIXEL_NORMALIZATION, NO_NORMALIZATION,
+            /* do normalization */ MEAN_NORMALIZATION,//MEAN_NORMALIZATION ,//PIXEL_NORMALIZATION, NO_NORMALIZATION,
             /* do initialization */ true, 
             /* approximate pairwise */false,
             /* use_prev_computation */true);
