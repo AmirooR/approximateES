@@ -133,7 +133,7 @@ class DenseEnergyMinimizer: public EnergyMinimizer
     int num_computations;
     double prev_p_e;
 
-  public:
+    public:
     DenseEnergyMinimizer(const char *im_path, const char *anno_path, int M, 
             int do_normalization = 0,
             bool do_initialization = true,
@@ -286,24 +286,24 @@ class DenseEnergyMinimizer: public EnergyMinimizer
             cout<<"AFTER ***"<<endl;
             crf->unaryEnergy( map, u_result);
             /* for test 
-            if(num_computations>0)
-                test_computations();
-            end for test */
+               if(num_computations>0)
+               test_computations();
+               end for test */
             double n_p_sum = compute_pairwise_energy(prev_p_e);
             if(use_prev_computation)
             {
                 /*  for test 
-                use_prev_computation = false;
-                double my_np_sum = compute_pairwise_energy(prev_p_e);
-                cout<<KBBLU<< "pairwise: "<<my_np_sum<<", using prev: "<<n_p_sum<<RESET<<endl;
-                use_prev_computation = true;
-                end of for test*/
+                    use_prev_computation = false;
+                    double my_np_sum = compute_pairwise_energy(prev_p_e);
+                    cout<<KBBLU<< "pairwise: "<<my_np_sum<<", using prev: "<<n_p_sum<<RESET<<endl;
+                    use_prev_computation = true;
+                    end of for test*/
 
                 memcpy(prev_map, map, N*sizeof(short));
                 prev_p_e = n_p_sum;
-                
+
             }
-            
+
             double n_u_sum = 0.0;
             u_sum = 0;
             for(int i = 0; i < N; ++i)
@@ -322,7 +322,7 @@ class DenseEnergyMinimizer: public EnergyMinimizer
         }
         return output;
     }
-    
+
     int getWidth(){return W;}
     int getHeight(){return H;}
 
@@ -331,6 +331,29 @@ class DenseEnergyMinimizer: public EnergyMinimizer
         return (size_t)N;
     }
 
+    /* computes kernel[k,k2] without normalization */
+    inline double compute_k_j_no_norm(int k, int k2)
+    {
+        /*int j = k/W;
+          int i = k%W;
+          int j2 = k2/W;
+          int i2 = k2%W;*/
+        int dx = (k%W) - (k2%W);//i - i2;
+        int dy = (k/W) - (k2/W);//j - j2;
+        int dr = im[k*3+0]-im[k2*3+0];
+        int dg = im[k*3+1]-im[k2*3+1];
+        int db = im[k*3+2]-im[k2*3+2];
+        double d_e = bw*exp(-0.5 * ( (dx*dx)/(bsx*bsx) + (dy*dy)/(bsy*bsy) + 
+                    (dr*dr)/(bsr*bsr) + (dg*dg)/(bsg*bsg) + (db*db)/(bsb*bsb) ) );
+        d_e += gw*exp(-0.5 * ( (dx*dx)/(gsx*gsx) + (dy*dy)/(gsy*gsy) ) );
+        return d_e;
+    }
+
+    /* computes the norms:
+     *  - mean_norm
+     *  - pixel-wise norm in norms[i]
+     *    for pixel i
+     * */
     void compute_norms()
     {
         mean_norm = 0.0;
@@ -339,50 +362,34 @@ class DenseEnergyMinimizer: public EnergyMinimizer
             double this_sum = 0.0;
 #pragma omp parallel for reduction(+:this_sum)                    
             for(int  k2=0; k2 < N;  k2++)
-            {
-                double d_e = 0;
-                int dx = (k%W) - (k2%W);//i - i2;
-                int dy = (k/W) - (k2/W);//j - j2;
-                int dr = im[k*3+0]-im[k2*3+0];
-                int dg = im[k*3+1]-im[k2*3+1];
-                int db = im[k*3+2]-im[k2*3+2];
-                d_e = bw*exp(-0.5 * ( (dx*dx)/(bsx*bsx) + (dy*dy)/(bsy*bsy) + 
-                            (dr*dr)/(bsr*bsr) + (dg*dg)/(bsg*bsg) + (db*db)/(bsb*bsb) ) );
-                d_e += gw*exp(-0.5 * ( (dx*dx)/(gsx*gsx) + (dy*dy)/(gsy*gsy) ) );
-                this_sum += d_e;
+            {                
+                this_sum += compute_k_j_no_norm(k,k2);
             }
             norms[k] = this_sum;
             mean_norm += this_sum;
         }
-        mean_norm = mean_norm/(N*N);
+        mean_norm = mean_norm/(N);
     }
- 
-    inline double compute_k_i_j(int k, int k2)
-    {
-        /*int j = k/W;
-          int i = k%W;
-          int j2 = k2/W;
-          int i2 = k2%W;*/
 
-        double d_e = 0.0;
-        int dx = (k%W) - (k2%W);//i - i2;
-        int dy = (k/W) - (k2/W);//j - j2;
-        int dr = im[k*3+0]-im[k2*3+0];
-        int dg = im[k*3+1]-im[k2*3+1];
-        int db = im[k*3+2]-im[k2*3+2];
-        d_e = bw*exp(-0.5 * ( (dx*dx)/(bsx*bsx) + (dy*dy)/(bsy*bsy) + 
-                    (dr*dr)/(bsr*bsr) + (dg*dg)/(bsg*bsg) + (db*db)/(bsb*bsb) ) );
-        d_e += gw*exp(-0.5 * ( (dx*dx)/(gsx*gsx) + (dy*dy)/(gsy*gsy) ) );
+    /* compute kernel[i,j] and normalize it */
+    inline double compute_k_i_j(int i, int j)
+    {
+        double d_e = compute_k_j_no_norm(i,j);
         if(do_normalization>0)
         {
             if(do_normalization == PIXEL_NORMALIZATION)
-                d_e /= norms[k];
+                d_e /= norms[i];
             else if(do_normalization == MEAN_NORMALIZATION)
                 d_e /= mean_norm;
         }
         return d_e;
     }
 
+    /* computing pairwise using previous energy
+     * @prev_pe: previous energy
+     * NOTE: @prev_map , @map are previous map, and current map labelling
+     * and should be set before calling this funtion.
+     * */
     double compute_pairwise_using_prev(double prev_pe)
     {
         double sum_e = prev_pe;
@@ -408,10 +415,33 @@ class DenseEnergyMinimizer: public EnergyMinimizer
                 }
             }
         }
-        //sum_e;
         return sum_e;
     }
 
+
+    double compute_pairwise_energy(double prev_pe)
+    {
+        if(num_computations > 0 && use_prev_computation)
+            return compute_pairwise_using_prev(prev_pe);
+        double sum_e = 0.0f;
+        for(int k=0; k < N; k++)
+        {
+#pragma omp parallel for reduction(-:sum_e)                    
+            for(int  k2=0; k2 < k;  k2++)
+            {
+                double d_e = 0;
+                if( map[k] == map[k2] )
+                {
+                    d_e = compute_k_i_j(k,k2); 
+                }
+                sum_e -= d_e;
+            }
+        }
+        num_computations++;
+        //prev_p_e = sum_e;
+        return sum_e;
+    }
+//DEBUG
     void test_computations()
     {
         check_symmetry();
@@ -514,7 +544,7 @@ class DenseEnergyMinimizer: public EnergyMinimizer
                 }
     }
 
-     
+
     void add(short* t_prev_map, short* t_new_map, int& num, double& sum)
     {
         sum = 0;
@@ -540,7 +570,7 @@ class DenseEnergyMinimizer: public EnergyMinimizer
             if( t_prev_map[i] != t_new_map[i] )
                 for(int j=0; j<N; j++)
                 {
-                    
+
                     if(t_prev_map[i] != t_prev_map[j] && t_new_map[i] == t_new_map[j] && i!=j)
                     {
                         if(! (t_prev_map[j] != t_new_map[j] && i > j) )
@@ -566,31 +596,9 @@ class DenseEnergyMinimizer: public EnergyMinimizer
                 }
     }
 
-   
+//END OF DEBUG
 
-    double compute_pairwise_energy(double prev_pe)
-    {
-        if(num_computations > 0 && use_prev_computation)
-            return compute_pairwise_using_prev(prev_pe);
-        double sum_e = 0.0f;
-        for(int k=0; k < N; k++)
-        {
-#pragma omp parallel for reduction(-:sum_e)                    
-            for(int  k2=0; k2 < k;  k2++)
-            {
-                double d_e = 0;
-                if( map[k] == map[k2] )
-                {
-                    d_e = compute_k_i_j(k,k2); 
-                }
-                sum_e -= d_e;
-            }
-        }
-        num_computations++;
-        //prev_p_e = sum_e;
-        return sum_e;
-    }
-    
+
     virtual ~DenseEnergyMinimizer()
     {
         if(crf)
@@ -642,17 +650,6 @@ int main( int argc, char* argv[]){
     
     for(size_t i = 0; i < labelings.size(); i++)
     {
-        /*Mat m = Mat::zeros(e->getHeight(), e->getWidth(), CV_8UC3);
-        for(int y = 0; y < e->getHeight(); y++)
-        {
-            for(int x = 0; x < e->getWidth(); x++)
-            {
-                if( labelings[i][ y*(e->getWidth()) + x] == 0 ) //fg
-                {
-                    m.at<Vec3b>(y,x) = Vec3b(255,255,255);
-                }
-            }
-        }*/
         string out("_output.ppm");
         string s = out_dir + SSTR( i ) + out;
         unsigned char *res = colorize( labelings[i].get(), e->getWidth(), e->getHeight());
