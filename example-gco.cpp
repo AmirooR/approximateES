@@ -3,6 +3,11 @@
 #include "GCoptimization.h"
 #include <vector>
 #include <cmath>
+#include <string>
+#include <sstream>
+
+#define SSTR( x ) dynamic_cast< std::ostringstream & >( \
+                ( std::ostringstream() << std::dec << x ) ).str()
 
 using namespace std;
 using namespace cv;
@@ -38,6 +43,9 @@ class StereoGCEnergyMinimizer: public EnergyMinimizer
         gc = new GCoptimizationGridGraph(width, height, num_labels); 
         cout<<"Constructed ... "<<endl;
     }
+
+    int getWidth(){return width;}
+    int getHeight(){return height;}
     
     size_t getNumberOfVariables()
     {
@@ -73,14 +81,17 @@ class StereoGCEnergyMinimizer: public EnergyMinimizer
             cout<<"Before optimization: energy is "<<gc->compute_energy()<<endl;
             gc->expansion(10);
             cout<<"After optimization: energy is "<<gc->compute_energy()<<endl;
+
+            double sum_unaries = 0.0;
                         
             for(size_t i = 0; i < number_of_vars; i++)
             {
                 output[i] = (short)gc->whatLabel(i);
+                sum_unaries += diffs[output[i]].at<double>(i/width,i%width);
             }
 
-            m = d * gc->giveDataEnergy() / (c+lambda*d);
-            b = c * gc->giveDataEnergy() / (c+lambda*d) + gc->giveSmoothEnergy();
+            m = d * sum_unaries;//gc->giveDataEnergy() / (c+lambda*d);
+            b = c * sum_unaries + gc->giveSmoothEnergy();//gc->giveDataEnergy() / (c+lambda*d) + gc->giveSmoothEnergy();
 
             energy = m * lambda + b;
             cout<<"M = "<<m<<", B = "<<b<<endl;
@@ -135,9 +146,26 @@ class StereoGCEnergyMinimizer: public EnergyMinimizer
 
 int main()
 {
-    StereoGCEnergyMinimizer* e = new StereoGCEnergyMinimizer("scene1.row3.col1.ppm", "scene1.row3.col2.ppm",  8, 100.0, 1.0, 5.0);
-    ApproximateES aes(e->getNumberOfVariables(), -10.0,10.0, e, NULL, 200);
+    StereoGCEnergyMinimizer* e = new StereoGCEnergyMinimizer("scene1.row3.col1.ppm", "scene1.row3.col2.ppm",  16, 0, 1.0, 1.0);
+    ApproximateES aes(e->getNumberOfVariables(), 0,1000.0, e, NULL, 10000);
     aes.loop();
+    
+    vector<short_array> labelings = aes.getLabelings();
+    for(size_t i = 0; i < labelings.size(); i++)
+    {
+        Mat m = Mat::zeros(e->getHeight(), e->getWidth(), CV_8UC3);
+        for(int y = 0; y < e->getHeight(); y++)
+        {
+            for(int x = 0; x < e->getWidth(); x++)
+            {
+                int l_color = labelings[i][ y*(e->getWidth()) + x]*16;
+                m.at<Vec3b>(y,x) = Vec3b(l_color,l_color,l_color);
+            }
+        }
+        string out("_output.png");
+        string s = string("stereo_")+SSTR( i ) + out;
+        imwrite(s.c_str(), m);
+    }
     delete e;
     return 0;
 }
