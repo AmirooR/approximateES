@@ -1,4 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+
 #IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 IF(APPLE)
        # Mac OS X specific code
@@ -26,7 +28,9 @@ add_subdirectory(fgbg-spatialy-varying-smooth)
 add_subdirectory(dense)
 add_executable(approximateES example-gco.cpp)
 add_executable(fgbg-gco fgbg-gco.cpp)
+add_executable(stereo-orig stereo-orig.cpp)
 
+target_link_libraries(stereo-orig libgco ${OpenCV_LIBS})
 target_link_libraries(approximateES libgco ${OpenCV_LIBS})
 target_link_libraries(fgbg-gco libgco ${OpenCV_LIBS})
 

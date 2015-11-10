@@ -299,9 +299,9 @@ class StereoGCEnergyMinimizer: public EnergyMinimizer
 
 int main(int argc, char* argv[])
 {
-    if(argc < 6)
+    if(argc < 7)
     {
-        printf("Usage: %s left-image right-image output_folder/ num_disparity scale\n", argv[0]);
+        printf("Usage: %s left-image right-image output_folder/ num_disparity scale lambda\n", argv[0]);
         return 1;
     }
     int num_disp = atoi(argv[4]);
@@ -315,32 +315,39 @@ int main(int argc, char* argv[])
             /*smooth_mult*/ 1.0, 
             /*lambda1*/ 0.1,
             /*lambda2*/ 1.0);
-    ApproximateES aes(e->getNumberOfVariables(), 
-            /*lambda_min*/ 0.0,
-            /*lambda_max*/15.1, 
-            /*minimizer*/e,
-            /*x_0*/ NULL, 
-            /* iterations */30, 
-            /* verbosity */10);
-    aes.loop();
-    string lambdas_file = string(argv[3]) + string("lambdas.txt");
-    aes.writeLambdas(lambdas_file.c_str());
-    vector<short_array> labelings = aes.getLabelings();
-    for(size_t i = 0; i < labelings.size(); i++)
+   // ApproximateES aes(e->getNumberOfVariables(), 
+   //         /*lambda_min*/ 0.0,
+   //         /*lambda_max*/15.1, 
+   //         /*minimizer*/e,
+    //        /*x_0*/ NULL, 
+     //       /* iterations */300, 
+      //      /* verbosity */10);
+    //aes.loop();
+    double _e, _m, _b;
+    double lambda = atof(argv[6]);
+    short_array in(new short[e->getNumberOfVariables()]);
+    for(size_t i=0; i < e->getNumberOfVariables(); i++)
+        in[i] = 0;
+    short_array x1 = e->minimize(in, lambda, _e, _m, _b);
+    string out_dir(argv[3]);
+    string out("_output.png");
+    string s = out_dir + string(argv[6]) + out;
+    string out_file = out_dir + string(argv[6]) + string(".txt");
+    FILE *fp = fopen(out_file.c_str(), "w");
+    fprintf(fp, "(lambda = %f) m = %f, b = %f, e = %f\n", lambda, _m, _b, _e);
+    fclose(fp);
+    
+    Mat m = Mat::zeros(e->getHeight(), e->getWidth()/*+num_disp-1*/, CV_8UC3);
+    for(int y = 0; y < e->getHeight(); y++)
     {
-        Mat m = Mat::zeros(e->getHeight(), e->getWidth()/*+num_disp-1*/, CV_8UC3);
-        for(int y = 0; y < e->getHeight(); y++)
+        for(int x = 0; x < e->getWidth(); x++)
         {
-            for(int x = 0; x < e->getWidth(); x++)
-            {
-                int l_color = labelings[i][ y*(e->getWidth()) + x]*scale;
-                m.at<Vec3b>(y,x/*+num_disp-1*/) = Vec3b(l_color,l_color,l_color);
-            }
+            int l_color = x1[ y*(e->getWidth()) + x]*scale;
+            m.at<Vec3b>(y,x/*+num_disp-1*/) = Vec3b(l_color,l_color,l_color);
         }
-        string out("_output.png");
-        string s = string(argv[3])+SSTR( i ) + out;
-        imwrite(s.c_str(), m);
     }
+    imwrite(s.c_str(), m);  
+    
     delete e;
     return 0;
 }
